@@ -25,7 +25,7 @@ class King : public Chesspiece{
             }
         }
         bool changeColor(){
-            if (this->status == "threatened"){
+            if (this->status == "checked"){
                 this->icon = "\x1b[31m" + this->icon + "\x1b[0m";
                 return true;
             }
@@ -40,7 +40,18 @@ class King : public Chesspiece{
             }
         }
         ~King(){};
-        void generateMoves(const std::unordered_map<std::string, std::string> occupiedCells){
+
+        King(const King& other) {
+            this->position = other.position;
+            this->points = other.points;
+            this->status = other.status;
+            this->team = other.team;
+            this->icon = other.icon;
+            this->name = other.name;
+            this->availableMoves = other.availableMoves;
+        }
+
+        void generateMoves(const std::unordered_map<std::string, std::string> occupiedCells) override{
             char col_name = toupper(this->position.at(0));
             char row_name = this->position.at(1);
             int col = int(col_name) - 65;

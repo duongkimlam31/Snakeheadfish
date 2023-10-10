@@ -36,25 +36,47 @@ class Chessboard{
             }
             promotionAvailable = false;
         }
-        ~Chessboard(){}
-        Chessboard &operator=(const Chessboard &origObject){
-            if (this != &origObject){
-                delete board;
-                delete occupiedCells;
-                delete whiteTeamAvailableMoves;
-                delete blackTeamAvailableMoves;
-                std::vector<std::vector<Cell*>> *newBoard = new std::vector<std::vector<Cell*>>;
-                *newBoard = *(origObject.board);
-                std::unordered_map<std::string, std::string> *newOccupiedCells = new std::unordered_map<std::string, std::string>;
-                *newOccupiedCells = *(origObject.occupiedCells);
-                std::set<std::string> *newWhiteTeamAvailableMoves = new std::set<std::string>;
-                *newWhiteTeamAvailableMoves = *(origObject.whiteTeamAvailableMoves);
-                std::set<std::string> *newBlackTeamAvailableMoves = new std::set<std::string>;
-                *newBlackTeamAvailableMoves = *(origObject.blackTeamAvailableMoves);
+        ~Chessboard() {
+            for (int i = 0; i < 8; ++i) {
+                for (int j = 0; j < 8; ++j) {
+                    delete board->at(i).at(j);
+                }
+            }
+            delete occupiedCells;
+            delete whiteTeamAvailableMoves;
+            delete blackTeamAvailableMoves;
+        }
+            
+       Chessboard& operator=(const Chessboard& origObject) {
+            if (this != &origObject) {
+                // Delete the existing resources
+                for (std::vector<Cell*>& row : *board) {
+                    for (Cell* cell : row) {
+                        delete cell;
+                    }
+                }
+                delete this->board;
+                delete this->occupiedCells;
+                delete this->whiteTeamAvailableMoves;
+                delete this->blackTeamAvailableMoves;
+
+                // Create new resources and deep copy the contents
+                this->board = new std::vector<std::vector<Cell*>>;
+                for (const std::vector<Cell*>& origRow : *(origObject.board)) {
+                    std::vector<Cell*> newRow;
+                    for (Cell* cell : origRow) {
+                        Cell *c = new Cell(*cell);
+                        newRow.push_back(c); // Deep copy each cell
+                    }
+                    this->board->push_back(newRow);
+                }
+
+                occupiedCells = new std::unordered_map<std::string, std::string>(*origObject.occupiedCells);
+                whiteTeamAvailableMoves = new std::set<std::string>(*origObject.whiteTeamAvailableMoves);
+                blackTeamAvailableMoves = new std::set<std::string>(*origObject.blackTeamAvailableMoves);
             }
             return *this;
         }
-
             
         std::vector<std::vector<Cell*>> *getBoard(){
             return this->board;
@@ -149,6 +171,50 @@ class Chessboard{
             }
         }
 
+        void generateWhiteTeamMoves(){
+            this->whiteTeamAvailableMoves->clear();
+            for (int i = 0; i < 8; ++i){
+                for (int j = 0; j < 8; ++j){
+                    if (board->at(i).at(j)->getPiece() == nullptr){
+                        continue;
+                    }
+                    else if (board->at(i).at(j)->getPiece()->getTeam() == "white"){
+                        Chesspiece *c = board->at(i).at(j)->getPiece();
+                        c->removeAllMoves();
+                        c->generateMoves((*this->occupiedCells));
+                        std::vector<std::string> moves = c->getAvailableMoves();
+                        if (c->getTeam() == "white"){
+                            for(int i = 0; i < moves.size(); ++i){
+                                this->whiteTeamAvailableMoves->insert(moves.at(i));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        void generateBlackTeamMoves(){
+            this->blackTeamAvailableMoves->clear();
+            for (int i = 0; i < 8; ++i){
+                for (int j = 0; j < 8; ++j){
+                    if (board->at(i).at(j)->getPiece() == nullptr){
+                        continue;
+                    }
+                    else if (board->at(i).at(j)->getPiece()->getTeam() == "black"){
+                        Chesspiece *c = board->at(i).at(j)->getPiece();
+                        c->removeAllMoves();
+                        c->generateMoves((*this->occupiedCells));
+                        std::vector<std::string> moves = c->getAvailableMoves();
+                        if (c->getTeam() == "black"){
+                            for(int i = 0; i < moves.size(); ++i){
+                                this->blackTeamAvailableMoves->insert(moves.at(i));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Cell *getCell(std::string position){
             char col_name = toupper(position.at(0));
             char row_name = position.at(1);
@@ -169,9 +235,20 @@ class Chessboard{
                 }
             }
             if (canMove){
+                char start_col_name = toupper(starting_location_name.at(0));
+                char start_row_name = starting_location_name.at(1);
+                int start_col = int(start_col_name) - 65;
+                int start_row = 7 - (int(start_row_name) - 49);
+
+                char des_col_name = toupper(destination_name.at(0));
+                char des_row_name = destination_name.at(1);
+                int des_col = int(des_col_name) - 65;
+                int des_row = 7 - (int(des_row_name) - 49);
+
                 Chesspiece *tmp = starting_location->getPiece();
                 tmp->setPosition(destination_name);
-                starting_location->setPiece(nullptr);
+
+                this->board->at(start_row).at(start_col)->setPiece(nullptr);
                 if (destination->getPiece() != nullptr){
                     destination->getPiece()->setStatus("captured");
                     if (tmp->getTeam() == "white" && tmp->getName().find("Pawn") != std::string::npos && destination_name.at(1) == '8'){
@@ -181,12 +258,13 @@ class Chessboard{
                         this->promotionAvailable = true;
                     }
                 }
-                destination->setPiece(tmp);
+                this->board->at(des_row).at(des_col)->setPiece(tmp);
                 (*occupiedCells).erase(starting_location_name);
-                (*occupiedCells)[destination->getName()] = destination->getPiece()->getTeam(); 
+                (*occupiedCells)[destination_name] = tmp->getTeam(); 
+
             }
         }
-
+        
         void promote(Team *team, Cell *destination){
             std::vector<Chesspiece*> pieces = team->getPieces();
             Chesspiece *p = destination->getPiece();
@@ -241,12 +319,18 @@ class Chessboard{
         void showAvailableMoves(std::string position){
             Cell *c = getCell(position);
             Chesspiece *p = c->getPiece();
+            if (p->getName().find("King") != std::string::npos && p->getStatus() == "checked"){
+                p->setStatus("active");
+                p->changeColor();
+            }
             std::vector<std::string> moves = p->getAvailableMoves();
             for (int i = 0; i < moves.size(); i++){
                 std::string tmp_pos = moves.at(i);
                 Cell*tmp_cell = getCell(tmp_pos);
                 if (tmp_cell->getPiece() != nullptr){
-                    tmp_cell->getPiece()->setStatus("threatened");
+                    if (tmp_cell->getPiece()->getName().find("King") == std::string::npos){
+                        tmp_cell->getPiece()->setStatus("threatened");
+                    }
                     tmp_cell->getPiece()->changeColor();
                 }
                 else{
@@ -268,8 +352,7 @@ class Chessboard{
                     }
                 }
             }
-    }
-
+        }
 };
 
 #endif

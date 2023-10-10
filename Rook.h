@@ -25,6 +25,16 @@ class Rook : public Chesspiece{
             }
         }
         ~Rook(){};
+        Rook(const Rook& other) {
+            this->position = other.position;
+            this->points = other.points;
+            this->status = other.status;
+            this->team = other.team;
+            this->icon = other.icon;
+            this->name = other.name;
+            this->availableMoves = other.availableMoves;
+        }
+
         bool changeColor(){
             if (this->status == "threatened"){
                 this->icon = "\x1b[31m" + this->icon + "\x1b[0m";
@@ -40,7 +50,7 @@ class Rook : public Chesspiece{
                 return false;
             }
         }
-        void generateMoves(const std::unordered_map<std::string, std::string> occupiedCells){
+        void generateMoves(const std::unordered_map<std::string, std::string> occupiedCells) override{
             char col_name = toupper(this->position.at(0));
             char row_name = this->position.at(1);
             int col = int(col_name) - 65;

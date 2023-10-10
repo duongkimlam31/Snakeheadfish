@@ -1,6 +1,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <iostream>
 
 #ifndef CHESSPIECE_H 
 #define CHESSPIECE_H
@@ -15,9 +16,28 @@ class Chesspiece {
         std::string name;
         std::vector<std::string> availableMoves;
     public:
-        virtual void generateMoves(const std::unordered_map<std::string, std::string> occupiedCells) = 0;
-        virtual bool changeColor() = 0;
+        virtual void generateMoves(const std::unordered_map<std::string, std::string> occupiedCells){}
+        virtual bool changeColor(){
+            return false;
+        }
         virtual ~Chesspiece(){};
+
+        Chesspiece& operator=(const Chesspiece& other) {
+        if (this == &other) {
+            return *this; // Handle self-assignment
+        }
+
+            this->position = other.position;
+            this->points = other.points;
+            this->status = other.status;
+            this->team = other.team;
+            this->icon = other.icon;
+            this->name = other.name;
+            this->availableMoves = other.availableMoves;
+
+            return *this; 
+        }
+
         std::string getPosition(){
             return this->position;
         }
