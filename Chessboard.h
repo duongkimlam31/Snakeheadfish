@@ -97,6 +97,7 @@ class Chessboard{
         void setBoard(std::vector<std::vector<Cell*>> *board){
             this->board = board;
         }
+
         void printBoard(){
             std::string s = "    A   B   C   D   E   F   G   H\n";
             int row_num = 0;
@@ -339,16 +340,47 @@ class Chessboard{
             for (int i = 0; i < 8; ++i){
                 for (int j = 0; j < 8; ++j){
                     Cell *c = this->board->at(i).at(j);
-                    if (c->getPrintStatus() == "*"){
+                    if (c->getPrintStatus() == "*" || c->getPrintStatus() == "\033[33m*\033[0m"){
                         c->setPrintStatus(" ");
                     }
-                    if (c->getPiece() != nullptr && c->getPiece()->getStatus() == "threatened"){
+                    if (c->getPiece() != nullptr && c->getPiece()->getStatus() != "active"){
                         c->getPiece()->setStatus("active");
                         c->getPiece()->changeColor();
                     }
                 }
             }
         }
+
+        void showLegalMoves(std::set<std::string> legalMoves, int turn){
+            for (int i = 0; i < 8; ++i){
+                for (int j = 0; j < 8; ++j){
+                    Cell *c = this->board->at(i).at(j);
+                    if (legalMoves.find(c->getName()) != legalMoves.end()){
+                        if (c->getPiece() == nullptr){
+                            c->setPrintStatus("\033[33m*\033[0m");
+                        }
+                        else{
+                            if (turn % 2 == 0 && c->getPiece()->getTeam() == "black"){
+                                c->getPiece()->setStatus("checking");
+                            }
+                            else if (turn % 2 != 0 && c->getPiece()->getTeam() == "white"){
+                                c->getPiece()->setStatus("checking");
+                            }
+                            else{
+                                c->getPiece()->setStatus("recommending");
+                            }
+                            c->getPiece()->changeColor();
+                        }
+                    }
+                    else{
+                       if (c->getPiece() == nullptr){
+                            c->setPrintStatus(" ");
+                        } 
+                    }
+                }
+            }
+        }
+
 };
 
 #endif

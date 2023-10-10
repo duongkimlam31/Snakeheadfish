@@ -41,6 +41,14 @@ class Knight : public Chesspiece{
                 this->icon = "\x1b[31m" + this->icon + "\x1b[0m";
                 return true;
             }
+            else if (this->status == "checking"){
+                this->icon = "\033[35m" + this->icon + "\033[0m";
+                return true;
+            }
+            else if (this->status == "recommending"){
+                this->icon = "\033[33m" + this->icon + "\033[0m";
+                return true;
+            }
             else{
                 if (team == "black"){
                     this->icon = "\u2658";

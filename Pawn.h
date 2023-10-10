@@ -45,6 +45,14 @@ class Pawn : public Chesspiece{
                 this->icon = "\x1b[31m" + this->icon + "\x1b[0m";
                 return true;
             }
+            else if (this->status == "checking"){
+                this->icon = "\033[35m" + this->icon + "\033[0m";
+                return true;
+            }
+            else if (this->status == "recommending"){
+                this->icon = "\033[33m" + this->icon + "\033[0m";
+                return true;
+            }
             else{
                 if (team == "black"){
                     this->icon = "\u2659";
@@ -81,12 +89,12 @@ class Pawn : public Chesspiece{
                     currentCell += char(int(row_name)+1);
                     if (occupiedCells.find(currentCell) == occupiedCells.end() && row > 0){
                         this->availableMoves.push_back(currentCell);
-                    }
-                    currentCell = "";
-                    currentCell += col_name;
-                    currentCell += char(int(row_name)+2);
-                    if (occupiedCells.find(currentCell) == occupiedCells.end() && row > 1){
-                        this->availableMoves.push_back(currentCell);
+                        currentCell = "";
+                        currentCell += col_name;
+                        currentCell += char(int(row_name)+2);
+                        if (occupiedCells.find(currentCell) == occupiedCells.end() && row > 1){
+                            this->availableMoves.push_back(currentCell);
+                        }
                     }
                 }
                 if (row > 0 && col > 0){
@@ -119,19 +127,19 @@ class Pawn : public Chesspiece{
                         this->availableMoves.push_back(currentCell);
                     }
                 }
-                //move 2 cells up
+                //move 2 cells down
                 else if (can_move_two_cells){
                     std::string currentCell = "";
                     currentCell += col_name;
                     currentCell += char(int(row_name)-1);
                     if (occupiedCells.find(currentCell) == occupiedCells.end() && row < 7){
                         this->availableMoves.push_back(currentCell);
-                    }
-                    currentCell = "";
-                    currentCell += col_name;
-                    currentCell += char(int(row_name)-2);
-                    if (occupiedCells.find(currentCell) == occupiedCells.end() && row < 6){
-                        this->availableMoves.push_back(currentCell);
+                        currentCell = "";
+                        currentCell += col_name;
+                        currentCell += char(int(row_name)-2);
+                        if (occupiedCells.find(currentCell) == occupiedCells.end() && row < 6){
+                            this->availableMoves.push_back(currentCell);
+                        }
                     }
                 }
                 if (row < 7 && col <= 7){
