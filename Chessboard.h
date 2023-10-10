@@ -319,10 +319,6 @@ class Chessboard{
         void showAvailableMoves(std::string position){
             Cell *c = getCell(position);
             Chesspiece *p = c->getPiece();
-            if (p->getName().find("King") != std::string::npos && p->getStatus() == "checked"){
-                p->setStatus("active");
-                p->changeColor();
-            }
             std::vector<std::string> moves = p->getAvailableMoves();
             for (int i = 0; i < moves.size(); i++){
                 std::string tmp_pos = moves.at(i);
