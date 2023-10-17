@@ -24,9 +24,8 @@ class Chesspiece {
 
         Chesspiece& operator=(const Chesspiece& other) {
         if (this == &other) {
-            return *this; // Handle self-assignment
+            return *this; 
         }
-
             this->position = other.position;
             this->points = other.points;
             this->status = other.status;
@@ -79,6 +78,9 @@ class Chesspiece {
         }
         void removeAllMoves(){
             this->availableMoves.clear();
+        }
+        void setAvailableMoves(std::vector<std::string> moves){
+            this->availableMoves = moves;
         }
 };
 

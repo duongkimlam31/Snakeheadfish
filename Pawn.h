@@ -5,6 +5,7 @@
 class Pawn : public Chesspiece{
     private:
         bool can_move_two_cells;
+        std::string en_passant;
     public:
         Pawn(){
             this->team = "";
@@ -12,6 +13,7 @@ class Pawn : public Chesspiece{
             this->status = "";
             this->position = "";
             this->can_move_two_cells = false;
+            this->en_passant = "";
         }
         Pawn(std::string name, std::string team, std::string position, int points = 1){
             this->name = name;
@@ -20,6 +22,7 @@ class Pawn : public Chesspiece{
             this->status = "active";
             this->position = position;
             this->can_move_two_cells = true;
+            this->en_passant = "";
             if (team == "black"){
                 this->icon = "\u2659";
             }
@@ -38,7 +41,16 @@ class Pawn : public Chesspiece{
             this->name = other.name;
             this->availableMoves = other.availableMoves;
             this->can_move_two_cells = other.can_move_two_cells;
+            this->en_passant = other.en_passant;
         }   
+
+        std::string getEnPassant(){
+            return this->en_passant;
+        }
+
+        void setEnPassant(std::string enPassant){
+            this->en_passant = enPassant;
+        }
 
         bool changeColor(){
             if (this->status == "threatened"){
@@ -113,6 +125,22 @@ class Pawn : public Chesspiece{
                         this->availableMoves.push_back(attackCell);
                     }
                 }
+                if (en_passant == "left"){
+                    std::string attackCell = "";
+                    attackCell += char(int(col_name)-1);
+                    attackCell += char(int(row_name)+1);
+                    if (occupiedCells.find(attackCell) == occupiedCells.end()){
+                        this->availableMoves.push_back(attackCell);
+                    }
+                }
+                else if (en_passant == "right"){
+                    std::string attackCell = "";
+                    attackCell += char(int(col_name)+1);
+                    attackCell += char(int(row_name)+1);
+                    if (occupiedCells.find(attackCell) == occupiedCells.end()){
+                        this->availableMoves.push_back(attackCell);
+                    }
+                }
             }
             else if (this->team == "black"){
                 if (row_name != '7'){
@@ -158,7 +186,22 @@ class Pawn : public Chesspiece{
                         this->availableMoves.push_back(attackCell);
                     }
                 }
-                
+                if (en_passant == "left"){
+                    std::string attackCell = "";
+                    attackCell += char(int(col_name)-1);
+                    attackCell += char(int(row_name)-1);
+                    if (occupiedCells.find(attackCell) == occupiedCells.end()){
+                        this->availableMoves.push_back(attackCell);
+                    }
+                }
+                else if (en_passant == "right"){
+                    std::string attackCell = "";
+                    attackCell += char(int(col_name)+1);
+                    attackCell += char(int(row_name)-1);
+                    if (occupiedCells.find(attackCell) == occupiedCells.end()){
+                        this->availableMoves.push_back(attackCell);
+                    }
+                }
             }
         }
 };

@@ -1,6 +1,6 @@
 #include "Chesspiece.h"
 #include "Cell.h"
-#include <string.h>
+#include <string>
 #include <vector>
 #include <unordered_map>
 #include <set>
@@ -21,6 +21,9 @@ class Chessboard{
         std::set<std::string> *whiteTeamAvailableMoves = new std::set<std::string>;
         std::set<std::string> *blackTeamAvailableMoves = new std::set<std::string>;
         bool promotionAvailable;
+        bool castleAvailable;
+        std::string enPassantAvailable;
+        std::string enPassantPawn;
 
     public:
         Chessboard(){
@@ -34,7 +37,10 @@ class Chessboard{
                     board->at(i).push_back(c);
                 }
             }
-            promotionAvailable = false;
+            this->promotionAvailable = false;
+            this->enPassantAvailable = "";
+            this->castleAvailable = false;
+            this->enPassantPawn = "";
         }
         ~Chessboard() {
             for (int i = 0; i < 8; ++i) {
@@ -74,6 +80,10 @@ class Chessboard{
                 occupiedCells = new std::unordered_map<std::string, std::string>(*origObject.occupiedCells);
                 whiteTeamAvailableMoves = new std::set<std::string>(*origObject.whiteTeamAvailableMoves);
                 blackTeamAvailableMoves = new std::set<std::string>(*origObject.blackTeamAvailableMoves);
+                this->promotionAvailable = origObject.promotionAvailable;
+                this->castleAvailable = origObject.castleAvailable;
+                this->enPassantAvailable = origObject.enPassantAvailable;
+                this->enPassantPawn = origObject.enPassantPawn;
             }
             return *this;
         }
@@ -87,13 +97,18 @@ class Chessboard{
         std::set<std::string> *getBlackTeamAvailableMoves(){
             return this->blackTeamAvailableMoves;
         }
+        std::string getEnPassantAvailability(){
+            return this->enPassantAvailable;
+        }
         bool getPromotionAvailable(){
             return this->promotionAvailable;
         }
         void setPromotionAvailable(bool promotionAvailable){
             this->promotionAvailable = promotionAvailable;
         }
-
+        void setEnPassantAvailability(std::string enPassantAvailable){
+            this->enPassantAvailable = enPassantAvailable;
+        }
         void setBoard(std::vector<std::vector<Cell*>> *board){
             this->board = board;
         }
@@ -224,11 +239,12 @@ class Chessboard{
             return this->board->at(row).at(col);
         }
 
-        void movePiece(Cell *starting_location, Cell *destination){
+        int movePiece(Cell *starting_location, Cell *destination){
             std::string destination_name = destination->getName();
             std::string starting_location_name = starting_location->getName();
             std::vector<std::string> available_moves = starting_location->getPiece()->getAvailableMoves();
             bool canMove = false;
+            int points = 0;
             for (int i = 0; i < available_moves.size(); ++i){
                 if (available_moves.at(i) == destination_name){
                     canMove = true;
@@ -252,18 +268,111 @@ class Chessboard{
                 this->board->at(start_row).at(start_col)->setPiece(nullptr);
                 if (destination->getPiece() != nullptr){
                     destination->getPiece()->setStatus("captured");
-                    if (tmp->getTeam() == "white" && tmp->getName().find("Pawn") != std::string::npos && destination_name.at(1) == '8'){
-                        this->promotionAvailable = true;
+                    points = destination->getPiece()->getPoints();
+                }
+                if (tmp->getTeam() == "white" && tmp->getName().find("Pawn") != std::string::npos && destination_name.at(1) == '8'){
+                    this->promotionAvailable = true;
+                }
+                else if (tmp->getTeam() == "black" && tmp->getName().find("Pawn") != std::string::npos && destination_name.at(1) == '1'){
+                    this->promotionAvailable = true;
+                }
+                if (destination->getPiece() == nullptr){
+                    char col_name = toupper(destination_name.at(0));
+                    char row_name = destination_name.at(1);
+                    int col = int(col_name) - 65;
+                    int row = 7 - (int(row_name) - 49);
+                    if (this->enPassantAvailable == "white"){
+                        if (tmp->getName().find("Pawn") != std::string::npos){
+                            Pawn *p = dynamic_cast<Pawn*>(tmp);
+                            std::string enPassantTo = "";
+                            enPassantTo += enPassantPawn.at(0);
+                            enPassantTo += char(int(enPassantPawn.at(1))+1);
+                            int en_passant_column = int(enPassantPawn.at(0)) - 65;
+                            int en_passant_row = 7 - (int(enPassantPawn.at(1)) - 49);
+                            if (enPassantTo == destination_name){
+                                Cell *c = getCell(enPassantPawn);
+                                points = c->getPiece()->getPoints();
+                                c->getPiece()->setStatus("captured");
+                                (*occupiedCells).erase(enPassantPawn);
+                                this->board->at(en_passant_row).at(en_passant_column)->setPiece(nullptr);
+                            }
+                        }
                     }
-                    else if (tmp->getTeam() == "black" && tmp->getName().find("Pawn") != std::string::npos && destination_name.at(1) == '1'){
-                        this->promotionAvailable = true;
+                    if (this->enPassantAvailable == "black"){
+                        if (tmp->getName().find("Pawn") != std::string::npos){
+                            Pawn *p = dynamic_cast<Pawn*>(tmp);
+                            std::string enPassantTo = "";
+                            enPassantTo += enPassantPawn.at(0);
+                            enPassantTo += char(int(enPassantPawn.at(1))-1);
+                            int en_passant_column = int(enPassantPawn.at(0)) - 65;
+                            int en_passant_row = 7 - (int(enPassantPawn.at(1)) - 49);
+                            if (enPassantTo == destination_name){
+                                Cell *c = getCell(enPassantPawn);
+                                points = c->getPiece()->getPoints();
+                                c->getPiece()->setStatus("captured");
+                                (*occupiedCells).erase(enPassantPawn);
+                                this->board->at(en_passant_row).at(en_passant_column)->setPiece(nullptr);
+                            }
+                        }
+                    }
+                    if (this->enPassantAvailable == "" && tmp->getTeam() == "white" && tmp->getName().find("Pawn") != std::string::npos && starting_location_name.at(1) == '2' && destination_name.at(1) == '4'){
+                        if (col > 0){
+                            std::string left_cell = "";
+                            left_cell += toupper(char(int(col_name)-1));
+                            left_cell += row_name;
+                            Cell *c = getCell(left_cell);
+                            if (c->getPiece() != nullptr && c->getPiece()->getName().find("Pawn") != std::string::npos && c->getPiece()->getTeam() == "black"){
+                                Pawn *p = dynamic_cast<Pawn*>(c->getPiece());
+                                p->setEnPassant("right");
+                                this->enPassantAvailable = "black";
+                            }
+                        }
+                        if (col < 7){
+                            std::string right_cell = "";
+                            right_cell += toupper((int(col_name)+1));
+                            right_cell += row_name;
+                            Cell *c = getCell(right_cell);
+                            if (c->getPiece() != nullptr && c->getPiece()->getName().find("Pawn") != std::string::npos && c->getPiece()->getTeam() == "black"){
+                                Pawn *p = dynamic_cast<Pawn*>(c->getPiece());
+                                p->setEnPassant("left");
+                                this->enPassantAvailable = "black";
+                            }
+                        }
+                        this->enPassantPawn = destination_name;
+                    }
+                    if (this->enPassantAvailable == "" && tmp->getTeam() == "black" && tmp->getName().find("Pawn") != std::string::npos && starting_location_name.at(1) == '7' && destination_name.at(1) == '5'){
+                        if (col > 0){
+                            std::string left_cell = "";
+                            left_cell += toupper(char(int(col_name)-1));
+                            left_cell += row_name;
+                            Cell *c = getCell(left_cell);
+                            if (c->getPiece() != nullptr && c->getPiece()->getName().find("Pawn") != std::string::npos && c->getPiece()->getTeam() == "white"){
+                                Pawn *p = dynamic_cast<Pawn*>(c->getPiece());
+                                p->setEnPassant("right");
+                                this->enPassantAvailable = "white";
+                            }
+                        }
+                        if (col < 7){
+                            std::string right_cell = "";
+                            right_cell += toupper((int(col_name)+1));
+                            right_cell += row_name;
+                            Cell *c = getCell(right_cell);
+                            if (c->getPiece() != nullptr && c->getPiece()->getName().find("Pawn") != std::string::npos && c->getPiece()->getTeam() == "white"){
+                                Pawn *p = dynamic_cast<Pawn*>(c->getPiece());
+                                p->setEnPassant("left");
+                                this->enPassantAvailable = "white";
+                            }
+                        }
+                        this->enPassantPawn = destination_name;
                     }
                 }
+
                 this->board->at(des_row).at(des_col)->setPiece(tmp);
                 (*occupiedCells).erase(starting_location_name);
                 (*occupiedCells)[destination_name] = tmp->getTeam(); 
 
             }
+            return points;
         }
         
         void promote(Team *team, Cell *destination){
@@ -323,7 +432,7 @@ class Chessboard{
             std::vector<std::string> moves = p->getAvailableMoves();
             for (int i = 0; i < moves.size(); i++){
                 std::string tmp_pos = moves.at(i);
-                Cell*tmp_cell = getCell(tmp_pos);
+                Cell* tmp_cell = getCell(tmp_pos);
                 if (tmp_cell->getPiece() != nullptr){
                     if (tmp_cell->getPiece()->getName().find("King") == std::string::npos){
                         tmp_cell->getPiece()->setStatus("threatened");
@@ -334,6 +443,16 @@ class Chessboard{
                     tmp_cell->setPrintStatus("*");
                 }
             } 
+            if (enPassantAvailable != ""){
+                if (p->getName().find("Pawn") != std::string::npos){
+                    Cell *tmp_cell = getCell(enPassantPawn);
+                    Pawn *tmp_pawn = dynamic_cast<Pawn*>(p);
+                    if (tmp_pawn->getEnPassant() != ""){
+                        tmp_cell->getPiece()->setStatus("threatened");
+                        tmp_cell->getPiece()->changeColor();
+                    }
+                }
+            }
         } 
 
         void removeAvailableMoves(){
