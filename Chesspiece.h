@@ -16,7 +16,7 @@ class Chesspiece {
         std::string name;
         std::vector<std::string> availableMoves;
     public:
-        virtual void generateMoves(const std::unordered_map<std::string, std::string> occupiedCells){}
+        virtual void generateMoves(const std::unordered_map<std::string, std::string> occupiedCells) = 0;
         virtual bool changeColor(){
             return false;
         }

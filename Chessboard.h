@@ -5,11 +5,8 @@
 #include <unordered_map>
 #include <set>
 #include <iostream>
-#include "Queen.h"
-#include "Rook.h"
-#include "Bishop.h"
-#include "Knight.h"
 #include "cstring"
+#include "Team.h"
 
 #ifndef CHESSBOARD_H
 #define CHESSBOARD_H
@@ -24,6 +21,8 @@ class Chessboard{
         bool castleAvailable;
         std::string enPassantAvailable;
         std::string enPassantPawn;
+        Team *white;
+        Team *black;
 
     public:
         Chessboard(){
@@ -41,13 +40,18 @@ class Chessboard{
             this->enPassantAvailable = "";
             this->castleAvailable = false;
             this->enPassantPawn = "";
+            this->white = new Team("white");
+            this->black = new Team("black");
         }
         ~Chessboard() {
+            delete white;
+            delete black;
             for (int i = 0; i < 8; ++i) {
                 for (int j = 0; j < 8; ++j) {
                     delete board->at(i).at(j);
                 }
             }
+            delete board;
             delete occupiedCells;
             delete whiteTeamAvailableMoves;
             delete blackTeamAvailableMoves;
@@ -56,6 +60,8 @@ class Chessboard{
        Chessboard& operator=(const Chessboard& origObject) {
             if (this != &origObject) {
                 // Delete the existing resources
+                delete this->white;
+                delete this->black;
                 for (std::vector<Cell*>& row : *board) {
                     for (Cell* cell : row) {
                         delete cell;
@@ -68,13 +74,15 @@ class Chessboard{
 
                 // Create new resources and deep copy the contents
                 this->board = new std::vector<std::vector<Cell*>>;
-                for (const std::vector<Cell*>& origRow : *(origObject.board)) {
-                    std::vector<Cell*> newRow;
-                    for (Cell* cell : origRow) {
-                        Cell *c = new Cell(*cell);
-                        newRow.push_back(c); // Deep copy each cell
+                for (int i = 0; i < 8; ++i){
+                    std::string row = std::to_string(8-i);
+                    this->board->push_back({});
+                    for (int j = 0; j < 8; ++j){
+                        char col = char(65+j);
+                        std::string cell_name = col+row; 
+                        Cell *c = new Cell(cell_name);
+                        this->board->at(i).push_back(c);
                     }
-                    this->board->push_back(newRow);
                 }
 
                 occupiedCells = new std::unordered_map<std::string, std::string>(*origObject.occupiedCells);
@@ -84,8 +92,86 @@ class Chessboard{
                 this->castleAvailable = origObject.castleAvailable;
                 this->enPassantAvailable = origObject.enPassantAvailable;
                 this->enPassantPawn = origObject.enPassantPawn;
+                this->white = new Team(*(origObject.white));
+                this->black = new Team(*(origObject.black));
+                for (int i = 0; i < this->white->getPieces().size(); ++i){
+                    if (this->white->getPieces().at(i)->getStatus() == "captured"){
+                        continue;
+                    }
+                    std::string tmp_position = this->white->getPieces().at(i)->getPosition();
+                    Cell *tmp_cell = getCell(tmp_position);
+                    tmp_cell->setPiece(this->white->getPieces().at(i));
+                }
+                for (int i = 0; i < this->black->getPieces().size(); ++i){
+                    std::string tmp_position = this->black->getPieces().at(i)->getPosition();
+                    if (this->black->getPieces().at(i)->getStatus() == "captured"){
+                        continue;
+                    }
+                    Cell *tmp_cell = getCell(tmp_position);
+                    tmp_cell->setPiece(this->black->getPieces().at(i));
+                }
             }
             return *this;
+        }
+
+        void setup(){
+            Chesspiece *wp1 = new Pawn("White Pawn 1", "white", "A2");
+            Chesspiece *wp2 = new Pawn("White Pawn 2", "white", "B2");
+            Chesspiece *wp3 = new Pawn("White Pawn 3", "white", "C2");
+            Chesspiece *wp4 = new Pawn("White Pawn 4", "white", "D2");
+            Chesspiece *wp5 = new Pawn("White Pawn 5", "white", "E2");
+            Chesspiece *wp6 = new Pawn("White Pawn 6", "white", "F2");
+            Chesspiece *wp7 = new Pawn("White Pawn 7", "white", "G2");
+            Chesspiece *wp8 = new Pawn("White Pawn 8", "white", "H2");
+
+            Chesspiece *bp1 = new Pawn("Black Pawn 1", "black", "A7");
+            Chesspiece *bp2 = new Pawn("Black Pawn 2", "black", "B7");
+            Chesspiece *bp3 = new Pawn("Black Pawn 3", "black", "C7");
+            Chesspiece *bp4 = new Pawn("Black Pawn 4", "black", "D7");
+            Chesspiece *bp5 = new Pawn("Black Pawn 5", "black", "E7");
+            Chesspiece *bp6 = new Pawn("Black Pawn 6", "black", "F7");
+            Chesspiece *bp7 = new Pawn("Black Pawn 7", "black", "G7");
+            Chesspiece *bp8 = new Pawn("Black Pawn 8", "black", "H7");
+
+            Chesspiece *wr1 = new Rook("White Rook 1", "white", "A1");
+            Chesspiece *wr2 = new Rook("White Rook 2", "white", "H1");
+            Chesspiece *br1 = new Rook("Black Rook 1", "black", "A8");
+            Chesspiece *br2 = new Rook("Black Rook 2", "black", "H8");
+
+            Chesspiece *wk1 = new Knight("White Knight 1", "white", "B1");
+            Chesspiece *wk2 = new Knight("White Knight 2", "white", "G1");
+            Chesspiece *bk1 = new Knight("Black Knight 1", "black", "B8");
+            Chesspiece *bk2 = new Knight("Black Knight 2", "black", "G8");
+
+            Chesspiece *wb1 = new Bishop("White Bishop 1", "white", "C1");
+            Chesspiece *wb2 = new Bishop("White Bishop 2", "white", "F1");
+            Chesspiece *bb1 = new Bishop("Black Bishop 1", "black", "C8");
+            Chesspiece *bb2 = new Bishop("Black Bishop 2", "black", "F8");
+
+            Chesspiece *wk = new King("White King", "white", "E1");
+            Chesspiece *bk = new King("Black King", "black", "E8");
+
+            Chesspiece *wq = new Queen("White Queen", "white", "D1");
+            Chesspiece *bq = new Queen("Black Queen", "black", "D8");
+
+            std::vector<Chesspiece*> row1 = {wr1, wk1, wb1, wq, wk, wb2, wk2, wr2};
+            std::vector<Chesspiece*> row2 = {wp1, wp2, wp3, wp4, wp5, wp6, wp7, wp8};
+            std::vector<Chesspiece*> row7 = {bp1, bp2, bp3, bp4, bp5, bp6, bp7, bp8};
+            std::vector<Chesspiece*> row8 = {br1, bk1, bb1, bq, bk, bb2, bk2, br2};
+            white->setKing(wk);
+            black->setKing(bk);
+
+            for (int i = 0; i < 8; ++i){
+                this->black->addPiece(row7.at(i));
+                this->black->addPiece(row8.at(i));
+                this->board->at(0).at(i)->setPiece(row8.at(i));
+                this->board->at(1).at(i)->setPiece(row7.at(i));
+                this->white->addPiece(row2.at(i));
+                this->white->addPiece(row1.at(i));
+                this->board->at(6).at(i)->setPiece(row2.at(i));
+                this->board->at(7).at(i)->setPiece(row1.at(i));
+            }
+            findOccupiedCells();
         }
             
         std::vector<std::vector<Cell*>> *getBoard(){
@@ -102,6 +188,12 @@ class Chessboard{
         }
         bool getPromotionAvailable(){
             return this->promotionAvailable;
+        }
+        Team *getWhiteTeam(){
+            return this->white;
+        }
+        Team *getBlackTeam(){
+            return this->black;
         }
         void setPromotionAvailable(bool promotionAvailable){
             this->promotionAvailable = promotionAvailable;
@@ -240,8 +332,8 @@ class Chessboard{
         }
 
         int movePiece(Cell *starting_location, Cell *destination){
-            std::string destination_name = destination->getName();
             std::string starting_location_name = starting_location->getName();
+            std::string destination_name = destination->getName();
             std::vector<std::string> available_moves = starting_location->getPiece()->getAvailableMoves();
             bool canMove = false;
             int points = 0;

@@ -24,6 +24,15 @@ class King : public Chesspiece{
                 this->icon = "\u265A";   
             }
         }
+        King(King& other) {
+            this->position = other.position;
+            this->points = other.points;
+            this->status = other.status;
+            this->team = other.team;
+            this->icon = other.icon;
+            this->name = other.name;
+            this->availableMoves = other.availableMoves;
+        } 
         bool changeColor(){
             if (this->status == "checked"){
                 this->icon = "\x1b[31m" + this->icon + "\x1b[0m";

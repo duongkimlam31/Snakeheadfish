@@ -29,33 +29,6 @@ public:
         this->printStatus = " ";
     }
 
-    Cell(const Cell& other){
-        this->name = other.name;
-        this->printStatus = other.printStatus;
-        if (other.piece == nullptr){
-            this->piece = nullptr;
-        }
-        else if (typeid(*other.piece) == typeid(Pawn)){
-            this->piece = new Pawn(*dynamic_cast<Pawn*>(other.getPiece()));
-        }
-        else if (typeid(*other.piece) == typeid(King)){
-            this->piece = new King(*dynamic_cast<King*>(other.getPiece()));
-        }
-        else if (typeid(*other.piece) == typeid(Bishop)){
-            this->piece = new Bishop(*dynamic_cast<Bishop*>(other.getPiece()));
-        }
-        else if (typeid(*other.piece) == typeid(Rook)){
-            this->piece = new Rook(*dynamic_cast<Rook*>(other.getPiece()));
-        }
-        else if (typeid(*other.piece) == typeid(Queen)){
-            this->piece = new Queen(*dynamic_cast<Queen*>(other.getPiece()));
-        }
-        else if (typeid(*other.piece) == typeid(Knight)){
-            this->piece = new Knight(*dynamic_cast<Knight*>(other.getPiece()));
-        }
-    }
-    
-
     // Getter for name
     std::string getName() const {
         return this->name;
