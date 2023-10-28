@@ -4,12 +4,17 @@
 #define ROOK_H
 
 class Rook : public Chesspiece{
+    private:
+        bool moved;
+        std::string castle_location;
     public:
         Rook(){
             this->team = "";
             this->points = 0;
             this->status = "";
             this->position = "";
+            this->moved = false;
+            this->castle_location = "";
         }
         Rook(std::string name, std::string team, std::string position, int points = 5){
             this->name = name;
@@ -17,6 +22,8 @@ class Rook : public Chesspiece{
             this->points = points;
             this->status = "active";
             this->position = position;
+            this->moved = false;
+            this->castle_location = "";
             if (team == "black"){
                 this->icon = "\u2656";
             }
@@ -32,7 +39,19 @@ class Rook : public Chesspiece{
             this->team = other.team;
             this->icon = other.icon;
             this->name = other.name;
+            this->moved = other.moved;
             this->availableMoves = other.availableMoves;
+        }
+        void setMoved(bool moved){
+            this->moved = moved;
+        }
+
+        void setCastleLocation(std::string castle_location){
+            this->castle_location = castle_location;
+        }
+
+        bool getMoved(){
+            return this->moved;
         }
 
         bool changeColor(){
@@ -148,6 +167,9 @@ class Rook : public Chesspiece{
                     }
                     break;
                 }
+            }
+            if (castle_location != "" && !moved){
+                this->availableMoves.push_back(castle_location);
             }
         }
 };

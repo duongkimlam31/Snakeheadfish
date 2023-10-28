@@ -4,12 +4,19 @@
 #define KING_H
 
 class King : public Chesspiece{
+    private:
+        bool moved;
+        bool castle_left;
+        bool castle_right;
     public:
         King(){
             this->team = "";
             this->points = 0;
             this->status = "";
             this->position = "";
+            this->moved = false;
+            this->castle_left = false;
+            this->castle_right = false;
         }
         King(std::string name, std::string team, std::string position, int points = 0){
             this->name = name;
@@ -17,6 +24,9 @@ class King : public Chesspiece{
             this->points = points;
             this->status = "active";
             this->position = position;
+            this->moved = false;
+            this->castle_left = false;
+            this->castle_right = false;
             if (team == "black"){
                     this->icon = "\u2654";
             }
@@ -31,8 +41,36 @@ class King : public Chesspiece{
             this->team = other.team;
             this->icon = other.icon;
             this->name = other.name;
+            this->moved = other.moved;
+            this->castle_left = other.castle_left;
+            this->castle_right = other.castle_right;
             this->availableMoves = other.availableMoves;
         } 
+
+        void setMoved(bool moved){
+            this->moved = moved;
+        }
+
+        void setCastleLeft(bool castle_left){
+            this->castle_left = castle_left;
+        }
+
+        void setCastleRight(bool castle_right){
+            this->castle_right = castle_right;
+        }
+
+        bool getMoved(){
+            return this->moved;
+        }
+
+        bool getCastleLeft(){
+            return this->castle_left;
+        }
+
+        bool getCastleRight(){
+            return this->castle_right;
+        }
+
         bool changeColor(){
             if (this->status == "checked"){
                 this->icon = "\x1b[31m" + this->icon + "\x1b[0m";
@@ -204,6 +242,18 @@ class King : public Chesspiece{
                         this->availableMoves.push_back(currentCell);
                     }
                 }
+            }
+            if (castle_left){
+                std::string currentCell = "";
+                currentCell += char(65+col-2);
+                currentCell += char(49+(7-row));
+                availableMoves.push_back(currentCell);
+            }
+            if (castle_right){
+                std::string currentCell = "";
+                currentCell += char(65+col+2);
+                currentCell += char(49+(7-row));
+                availableMoves.push_back(currentCell);
             }
         }
 };

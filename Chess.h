@@ -75,26 +75,6 @@ class Chess{
             return check;
         }
 
-        void removeEnPassant(int turn){
-            Team *team_to_remove;
-            if (turn % 2 == 0 && this->chessboard->getEnPassantAvailability() == "black"){
-                team_to_remove = this->chessboard->getBlackTeam();
-            }
-            else if (turn % 2 != 0 && this->chessboard->getEnPassantAvailability() == "white"){
-                team_to_remove = this->chessboard->getWhiteTeam();
-            }
-            else{
-                return;
-            }
-            std::vector<Chesspiece*> pieces = team_to_remove->getPieces();
-            for (int i = 0; i < pieces.size(); ++i){
-                if (pieces.at(i)->getName().find("Pawn") != std::string::npos){
-                    Pawn *p = dynamic_cast<Pawn*>(pieces.at(i));
-                    p->setEnPassant("");
-                }
-            }
-        }
-
         void pruneAvailableMoves(std::set<std::string> legalMoves, int turn){
             Team *team;
             if (turn % 2 == 0){
@@ -108,15 +88,25 @@ class Chess{
                 if (team_pieces.at(i)->getStatus() != "captured"){
                     std::vector<std::string> moves = team_pieces.at(i)->getAvailableMoves();
                     std::vector<std::string> prunedMoves;
+                    Chessboard next_state;
                     for (int j = 0; j < moves.size(); ++j){
-                        auto it = legalMoves.find(moves.at(j));
-                        if (it != legalMoves.end()){
-                            prunedMoves.push_back(moves.at(j));
+                        next_state = *this->chessboard;
+                        Cell c1 = *next_state.getCell(team_pieces.at(i)->getPosition());
+                        Cell c2 = *next_state.getCell(moves.at(j));
+                        next_state.movePiece(&c1, &c2);
+                        if (turn % 2 == 0){
+                            next_state.generateBlackTeamMoves();
+                        }
+                        else{
+                            next_state.generateWhiteTeamMoves();
+                        }
+                        if (!inCheckForSimulation(turn, &next_state)){
+                            prunedMoves.push_back(c2.getName());
                         }
                     }
                     team_pieces.at(i)->setAvailableMoves(prunedMoves);
                 }
-            }
+            }     
         }
 
         void addPoints(int points, int turn){
@@ -141,7 +131,6 @@ class Chess{
                 c1 = *next_state.getCell(starting_location);
                 Cell c2 = *next_state.getCell(moves.at(i));
                 next_state.movePiece(&c1, &c2);
-                next_state.printBoard();
                 if (turn % 2 == 0){
                     next_state.generateBlackTeamMoves();
                 }
@@ -179,59 +168,58 @@ class Chess{
             return all_legal_moves;
         }
         
-        void start(){
+        void start(std::string player_team){
             std::string input;
             int turn = 0;
             bool announced = false;
             bool checkmate = false;
             bool stalemate = false;
+            bool in_check = false;
             while (true) {
-                this->chessboard->generateAllMoves();
-                std::set<std::string> all_legal_moves;
-                all_legal_moves = allLegalMoves(turn);
-                pruneAvailableMoves(all_legal_moves, turn);
                 if (!announced){
+                    this->chessboard->generateAllMoves();
                     if (turn % 2 == 0){
                         if (inCheck(turn, this->chessboard, this->chessboard->getWhiteTeam()->getKing())){
-                            if (all_legal_moves.size() == 0){
-                                checkmate = true;
-                                break;
-                            }
-                            else{
-                                this->chessboard->getWhiteTeam()->getKing()->setStatus("checked");
-                                this->chessboard->getWhiteTeam()->getKing()->changeColor();
-                                std::cout << "White team is in check.\n" << std::endl;
-                                this->chessboard->showLegalMoves(all_legal_moves, turn);
-                            }
-                        }
-                        else {
-                            this->chessboard->getBlackTeam()->getKing()->setStatus("active");
-                            this->chessboard->getBlackTeam()->getKing()->changeColor();
+                            in_check = true;
+                            this->chessboard->getWhiteTeam()->getKing()->setStatus("checked");
+                            this->chessboard->getWhiteTeam()->getKing()->changeColor();
+                            std::cout << "White team is in check.\n" << std::endl;
                         }
                     }
                     else if (turn % 2 != 0){
                         if (inCheck(turn, this->chessboard, this->chessboard->getBlackTeam()->getKing())){
-                            if (all_legal_moves.size() == 0){
-                                checkmate = true;
-                                break;
-                            }
-                            else{
-                                this->chessboard->getBlackTeam()->getKing()->setStatus("checked");
-                                this->chessboard->getBlackTeam()->getKing()->changeColor();
-                                std::cout << "Black team is in check.\n" << std::endl;
-                                this->chessboard->showLegalMoves(all_legal_moves, turn);
-                            }
-                        }
-                        else {
-                            this->chessboard->getWhiteTeam()->getKing()->setStatus("active");
-                            this->chessboard->getWhiteTeam()->getKing()->changeColor();
-                        }
-                        if (all_legal_moves.size() == 0){
-                            stalemate = true;
-                            break;
+                            in_check = true;
+                            this->chessboard->getBlackTeam()->getKing()->setStatus("checked");
+                            this->chessboard->getBlackTeam()->getKing()->changeColor();
+                            std::cout << "Black team is in check.\n" << std::endl;
                         }
                     }
-                    this->chessboard->printBoard();
+                    if (in_check){
+                    this->chessboard->removeCastleStatus();
+                    this->chessboard->generateAllMoves();
+                    }
+                    std::set<std::string> all_legal_moves;
+                    all_legal_moves = allLegalMoves(turn);
+                    pruneAvailableMoves(all_legal_moves, turn);
+                    if (in_check){
+                        if (all_legal_moves.size() == 0){
+                            checkmate = true;
+                            break;
+                        }
+                        else{
+                            this->chessboard->showLegalMoves(all_legal_moves, turn);
+                        }
+                    }
+                    if (all_legal_moves.size() == 0){
+                        stalemate = true;
+                        break;
+                    }
+                    if (player_team == "white"){
+                        this->chessboard->printBoard();
+                    }
+                    else{
+                        this->chessboard->printBoardReverse();
+                    }
                 }
                 if (turn % 2 != 0 && !announced){
                     std::cout << "Black team's turn: \n";
@@ -241,6 +229,7 @@ class Chess{
                     std::cout << "White team's turn: \n";
                     announced = true;
                 }
+                std::cout << "Choose a square: ";
                 std::cin >> input;
                 if (input == "0"){
                     break;
@@ -280,7 +269,12 @@ class Chess{
                 if (this->chessboard->getWhiteTeam()->getKing()->getStatus() != "checked" && this->chessboard->getBlackTeam()->getKing()->getStatus() != "checked"){
                     this->chessboard->showAvailableMoves(c1->getName());
                 }
-                this->chessboard->printBoard();
+                if (player_team == "white"){
+                    this->chessboard->printBoard();
+                }
+                else{
+                    this->chessboard->printBoardReverse();
+                }
                 std::string input_move;
                 bool nextTurn = false;
                 bool announced_2 = false;
@@ -289,6 +283,7 @@ class Chess{
                         std::cout << "Press 1 to go back." << std::endl;
                         announced_2 = true;
                     }
+                    std::cout << "Choose a square: ";
                     std::cin >> input_move;
                     if (input_move == "1"){
                         this->chessboard->removeAvailableMoves();
@@ -331,12 +326,16 @@ class Chess{
                     }
                 }
                 if (nextTurn){
-                    this->chessboard->removeAvailableMoves();
                     Cell *c2 = this->chessboard->getCell(input_move);
                     int points = this->chessboard->movePiece(c1, c2);
                     addPoints(points, turn);
                     if (this->chessboard->getPromotionAvailable()){
-                        this->chessboard->printBoard();
+                        if (player_team == "white"){
+                            this->chessboard->printBoard();
+                        }
+                        else{
+                            this->chessboard->printBoardReverse();
+                        }
                         if (turn %2 == 0){
                             this->chessboard->promote(this->chessboard->getWhiteTeam(), c2);
                         }
@@ -347,6 +346,8 @@ class Chess{
                     }
                     announced = false;
                     ++turn;
+                    in_check = false;
+                    this->chessboard->removeAvailableMoves();
                     if (this->chessboard->getWhiteTeam()->getKing()->getStatus() == "checked"){
                         this->chessboard->getWhiteTeam()->getKing()->setStatus("active");
                         this->chessboard->getWhiteTeam()->getKing()->changeColor();
@@ -355,10 +356,16 @@ class Chess{
                         this->chessboard->getBlackTeam()->getKing()->setStatus("active");
                         this->chessboard->getBlackTeam()->getKing()->changeColor();
                     }
-                    removeEnPassant(turn);
+                    this->chessboard->removeEnPassant(turn);
+                    this->chessboard->removeCastleStatus();
                 }
             }
-            this->chessboard->printBoard();
+            if (player_team == "white"){
+                    this->chessboard->printBoard();
+                }
+                else{
+                    this->chessboard->printBoardReverse();
+                }
             if (stalemate){
                 std::cout << "Stalemate" << std::endl;
             }

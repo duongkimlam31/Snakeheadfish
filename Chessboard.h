@@ -18,7 +18,6 @@ class Chessboard{
         std::set<std::string> *whiteTeamAvailableMoves = new std::set<std::string>;
         std::set<std::string> *blackTeamAvailableMoves = new std::set<std::string>;
         bool promotionAvailable;
-        bool castleAvailable;
         std::string enPassantAvailable;
         std::string enPassantPawn;
         Team *white;
@@ -38,7 +37,6 @@ class Chessboard{
             }
             this->promotionAvailable = false;
             this->enPassantAvailable = "";
-            this->castleAvailable = false;
             this->enPassantPawn = "";
             this->white = new Team("white");
             this->black = new Team("black");
@@ -89,7 +87,6 @@ class Chessboard{
                 whiteTeamAvailableMoves = new std::set<std::string>(*origObject.whiteTeamAvailableMoves);
                 blackTeamAvailableMoves = new std::set<std::string>(*origObject.blackTeamAvailableMoves);
                 this->promotionAvailable = origObject.promotionAvailable;
-                this->castleAvailable = origObject.castleAvailable;
                 this->enPassantAvailable = origObject.enPassantAvailable;
                 this->enPassantPawn = origObject.enPassantPawn;
                 this->white = new Team(*(origObject.white));
@@ -158,8 +155,8 @@ class Chessboard{
             std::vector<Chesspiece*> row2 = {wp1, wp2, wp3, wp4, wp5, wp6, wp7, wp8};
             std::vector<Chesspiece*> row7 = {bp1, bp2, bp3, bp4, bp5, bp6, bp7, bp8};
             std::vector<Chesspiece*> row8 = {br1, bk1, bb1, bq, bk, bb2, bk2, br2};
-            white->setKing(wk);
-            black->setKing(bk);
+            white->setKing(dynamic_cast<King*>(wk));
+            black->setKing(dynamic_cast<King*>(bk));
 
             for (int i = 0; i < 8; ++i){
                 this->black->addPiece(row7.at(i));
@@ -205,6 +202,137 @@ class Chessboard{
             this->board = board;
         }
 
+        void checkCastleStatus(){
+            std::string order = "";
+            if(this->white->getKing()->getStatus() != "checked" && !this->white->getKing()->getMoved()){
+                for (int i = 0; i < 5; ++i){
+                    if (this->board->at(7).at(i)->getPiece() != NULL && this->board->at(7).at(i)->getPiece()->getName().find("King") != std::string::npos){
+                        order += "k";
+                    }
+                    else if (this->board->at(7).at(i)->getPiece() != NULL && this->board->at(7).at(i)->getPiece()->getName().find("Rook") != std::string::npos){
+                        order += "r";
+                    }
+                    else if (this->board->at(7).at(i)->getPiece() == NULL){
+                        order += "n";
+                    }
+                }
+                if (order == "rnnnk"){
+                    Rook *r = dynamic_cast<Rook*>(this->board->at(7).at(0)->getPiece());
+                    if (!r->getMoved()){
+                        this->white->getKing()->setCastleLeft(true);
+                        r->setCastleLocation("D1");
+                    }
+                }
+                order = "";
+                for (int i = 4; i < 8; ++i){
+                    if (this->board->at(7).at(i)->getPiece() != NULL && this->board->at(7).at(i)->getPiece()->getName().find("King") != std::string::npos){
+                        order += "k";
+                    }
+                    else if (this->board->at(7).at(i)->getPiece() != NULL && this->board->at(7).at(i)->getPiece()->getName().find("Rook") != std::string::npos){
+                        order += "r";
+                    }
+                    else if (this->board->at(7).at(i)->getPiece() == NULL){
+                        order += "n";
+                    }
+                }
+                if (order == "knnr"){
+                    Rook *r = dynamic_cast<Rook*>(this->board->at(7).at(7)->getPiece());
+                    if (!r->getMoved()){
+                        this->white->getKing()->setCastleRight(true);
+                        r->setCastleLocation("F1");
+                    }
+                }
+            }
+            if (this->black->getKing()->getStatus() != "checked" && !this->black->getKing()->getMoved()){
+                order = "";
+                for (int i = 0; i < 5; ++i){
+                    if (this->board->at(0).at(i)->getPiece() != NULL && this->board->at(0).at(i)->getPiece()->getName().find("King") != std::string::npos){
+                        order += "k";
+                    }
+                    else if (this->board->at(0).at(i)->getPiece() != NULL && this->board->at(0).at(i)->getPiece()->getName().find("Rook") != std::string::npos){
+                        order += "r";
+                    }
+                    else if (this->board->at(0).at(i)->getPiece() == NULL){
+                        order += "n";
+                    }
+                }
+                if (order == "rnnnk"){
+                    Rook *r = dynamic_cast<Rook*>(this->board->at(0).at(0)->getPiece());
+                    if (!r->getMoved()){
+                        this->black->getKing()->setCastleLeft(true);
+                        r->setCastleLocation("D8");
+                    }
+                }
+                order = "";
+                for (int i = 4; i < 8; ++i){
+                    if (this->board->at(0).at(i)->getPiece() != NULL && this->board->at(0).at(i)->getPiece()->getName().find("King") != std::string::npos){
+                        order += "k";
+                    }
+                    else if (this->board->at(0).at(i)->getPiece() != NULL && this->board->at(0).at(i)->getPiece()->getName().find("Rook") != std::string::npos){
+                        order += "r";
+                    }
+                    else if (this->board->at(0).at(i)->getPiece() == NULL){
+                        order += "n";
+                    }
+                }
+                if (order == "knnr"){
+                    Rook *r = dynamic_cast<Rook*>(this->board->at(0).at(7)->getPiece());
+                    if (!r->getMoved()){
+                        this->black->getKing()->setCastleRight(true);
+                        r->setCastleLocation("F8");
+                    }
+                }
+            }
+        }
+
+        void removeEnPassant(int turn){
+            Team *team_to_remove;
+            if (turn % 2 == 0 && getEnPassantAvailability() == "black"){
+                team_to_remove = this->black;
+            }
+            else if (turn % 2 != 0 && getEnPassantAvailability() == "white"){
+                team_to_remove = this->white;
+            }
+            else{
+                return;
+            }
+            std::vector<Chesspiece*> pieces = team_to_remove->getPieces();
+            for (int i = 0; i < pieces.size(); ++i){
+                if (pieces.at(i)->getName().find("Pawn") != std::string::npos){
+                    Pawn *p = dynamic_cast<Pawn*>(pieces.at(i));
+                    p->setEnPassant("");
+                    enPassantAvailable = "";
+                    enPassantPawn = "";
+                }
+            }
+        }
+
+        void removeCastleStatus(){
+            if (this->white->getKing()->getCastleLeft()){
+                this->white->getKing()->setCastleLeft(false);
+            }
+            if (this->white->getKing()->getCastleRight()){
+                this->white->getKing()->setCastleRight(false);
+            }
+            if (this->black->getKing()->getCastleLeft()){
+                this->black->getKing()->setCastleLeft(false);
+            }
+            if (this->black->getKing()->getCastleRight()){
+                this->black->getKing()->setCastleRight(false);
+            }
+            for (int i = 0; i < 16; ++i){
+                Rook *r;
+                if (this->white->getPieces().at(i)->getName().find("Rook") != std::string::npos){
+                    r = dynamic_cast<Rook*>(this->white->getPieces().at(i));
+                    r->setCastleLocation("");
+                }
+                if (this->black->getPieces().at(i)->getName().find("Rook") != std::string::npos){
+                    r = dynamic_cast<Rook*>(this->black->getPieces().at(i));
+                    r->setCastleLocation("");
+                }
+            }
+        }
+
         void printBoard(){
             std::string s = "    A   B   C   D   E   F   G   H\n";
             int row_num = 0;
@@ -234,6 +362,37 @@ class Chessboard{
             s += "    A   B   C   D   E   F   G   H\n";
             std::cout << s << std::endl;
         }
+
+        void printBoardReverse(){
+            std::string s = "    A   B   C   D   E   F   G   H\n";
+            int row_num = 0;
+            for (int i = 0; i < 16; ++i){
+                if (i % 2 == 0){
+                    s += "  +---+---+---+---+---+---+---+---+\n";
+                }
+                else{
+                    std::string row_num_s = std::to_string(row_num+1);
+                    std::string tmp = "";
+                    tmp += row_num_s + " ";
+                    for (int j = 0; j < 8; ++j){
+                        tmp += "| ";
+                        if (this->board->at(7-row_num).at(j)->getPiece() == nullptr){
+                            tmp += this->board->at(7-row_num).at(j)->getPrintStatus() + " ";
+                        }
+                        else{
+                            tmp += board->at(7-row_num).at(j)->getPiece()->getIcon() + " ";
+                        }
+                    }
+                    ++row_num;
+                    tmp += "| " + row_num_s + "\n";
+                    s += tmp;
+                }
+            }
+            s += "  +---+---+---+---+---+---+---+---+\n";
+            s += "    A   B   C   D   E   F   G   H\n";
+            std::cout << s << std::endl;
+        }
+
         std::unordered_map<std::string, std::string> *getOccupiedCells(){
             return this->occupiedCells;
         }
@@ -252,6 +411,7 @@ class Chessboard{
         }
 
         void generateAllMoves(){
+            checkCastleStatus();
             this->whiteTeamAvailableMoves->clear();
             this->blackTeamAvailableMoves->clear();
             for (int i = 0; i < 8; ++i){
@@ -358,6 +518,42 @@ class Chessboard{
                 tmp->setPosition(destination_name);
 
                 this->board->at(start_row).at(start_col)->setPiece(nullptr);
+                if (tmp->getName().find("King") != std::string::npos){
+                    King *k = dynamic_cast<King*>(tmp);
+                    if (k->getTeam() == "white" && starting_location_name == "E1" && destination_name == "C1" && k->getCastleLeft()){
+                        Chesspiece *tmpr = getCell("A1")->getPiece();
+                        Rook *r = dynamic_cast<Rook*>(tmpr);
+                        Cell *c1 = getCell("A1");
+                        Cell *c2 = getCell("D1");
+                        movePiece(c1, c2);
+                    }
+                    if (k->getTeam() == "white" && starting_location_name == "E1" && destination_name == "G1" && k->getCastleRight()){
+                        Chesspiece *tmpr = getCell("H1")->getPiece();
+                        Rook *r = dynamic_cast<Rook*>(tmpr);
+                        Cell *c1 = getCell("H1");
+                        Cell *c2 = getCell("F1");
+                        movePiece(c1, c2);
+                    }
+                    if (k->getTeam() == "black" && starting_location_name == "E8" && destination_name == "C8" && k->getCastleLeft()){
+                        Chesspiece *tmpr = getCell("A8")->getPiece();
+                        Rook *r = dynamic_cast<Rook*>(tmpr);
+                        Cell *c1 = getCell("A8");
+                        Cell *c2 = getCell("D8");
+                        movePiece(c1, c2);
+                    }
+                    if (k->getTeam() == "black" && starting_location_name == "E8" && destination_name == "G8" && k->getCastleRight()){
+                        Chesspiece *tmpr = getCell("H8")->getPiece();
+                        Rook *r = dynamic_cast<Rook*>(tmpr);
+                        Cell *c1 = getCell("H8");
+                        Cell *c2 = getCell("F8");
+                        movePiece(c1, c2);
+                    }
+                    k->setMoved(true);
+                }
+                else if (tmp->getName().find("Rook") != std::string::npos){
+                    Rook *r = dynamic_cast<Rook*>(tmp);
+                    r->setMoved(true);
+                }
                 if (destination->getPiece() != nullptr){
                     destination->getPiece()->setStatus("captured");
                     points = destination->getPiece()->getPoints();
@@ -551,7 +747,7 @@ class Chessboard{
             for (int i = 0; i < 8; ++i){
                 for (int j = 0; j < 8; ++j){
                     Cell *c = this->board->at(i).at(j);
-                    if (c->getPrintStatus() == "*" || c->getPrintStatus() == "\033[33m*\033[0m"){
+                    if (c->getPrintStatus() == "*"){
                         c->setPrintStatus(" ");
                     }
                     if (c->getPiece() != nullptr && c->getPiece()->getStatus() != "active"){
@@ -570,7 +766,7 @@ class Chessboard{
                         if (c->getPiece() == nullptr){
                             c->setPrintStatus("\033[33m*\033[0m");
                         }
-                        else{
+                        if (c->getPiece() != nullptr){
                             if (turn % 2 == 0 && c->getPiece()->getTeam() == "black"){
                                 c->getPiece()->setStatus("checking");
                             }

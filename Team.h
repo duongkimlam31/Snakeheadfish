@@ -15,7 +15,7 @@ class Team{
     private:
         int points;
         std::vector<Chesspiece*> pieces;
-        Chesspiece *king;
+        King *king;
         std::string name;
 
     public:
@@ -44,7 +44,7 @@ class Team{
                 }
                 else if (typeid(*originalPiece) == typeid(King)){
                     newPiece = new King(*dynamic_cast<King*>(originalPiece));
-                    this->king = newPiece;
+                    this->king = dynamic_cast<King*>(newPiece);
                 }
                 else if (typeid(*originalPiece) == typeid(Bishop)){
                     newPiece = new Bishop(*dynamic_cast<Bishop*>(originalPiece));
@@ -90,12 +90,12 @@ class Team{
         }
         
         // Getter for king
-        Chesspiece *getKing() const{
+        King *getKing() const{
             return this->king;
         }
 
         // Setter for king
-        void setKing(Chesspiece *king){
+        void setKing(King *king){
             this->king = king;
         }
 
