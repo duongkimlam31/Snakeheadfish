@@ -204,6 +204,8 @@ class Chessboard{
 
         void checkCastleStatus(){
             std::string order = "";
+            generateWhiteTeamMoves();
+            generateBlackTeamMoves();
             if(this->white->getKing()->getStatus() != "checked" && !this->white->getKing()->getMoved()){
                 for (int i = 0; i < 5; ++i){
                     if (this->board->at(7).at(i)->getPiece() != NULL && this->board->at(7).at(i)->getPiece()->getName().find("King") != std::string::npos){
@@ -218,7 +220,8 @@ class Chessboard{
                 }
                 if (order == "rnnnk"){
                     Rook *r = dynamic_cast<Rook*>(this->board->at(7).at(0)->getPiece());
-                    if (!r->getMoved()){
+                    auto it = blackTeamAvailableMoves->find("D1");
+                    if (!r->getMoved() && (it == blackTeamAvailableMoves->end())){
                         this->white->getKing()->setCastleLeft(true);
                         r->setCastleLocation("D1");
                     }
@@ -237,7 +240,8 @@ class Chessboard{
                 }
                 if (order == "knnr"){
                     Rook *r = dynamic_cast<Rook*>(this->board->at(7).at(7)->getPiece());
-                    if (!r->getMoved()){
+                    auto it = blackTeamAvailableMoves->find("F1");
+                    if (!r->getMoved() && it == blackTeamAvailableMoves->end()){
                         this->white->getKing()->setCastleRight(true);
                         r->setCastleLocation("F1");
                     }
@@ -258,7 +262,8 @@ class Chessboard{
                 }
                 if (order == "rnnnk"){
                     Rook *r = dynamic_cast<Rook*>(this->board->at(0).at(0)->getPiece());
-                    if (!r->getMoved()){
+                    auto it = whiteTeamAvailableMoves->find("D8");
+                    if (!r->getMoved() && it == whiteTeamAvailableMoves->end()){
                         this->black->getKing()->setCastleLeft(true);
                         r->setCastleLocation("D8");
                     }
@@ -277,7 +282,8 @@ class Chessboard{
                 }
                 if (order == "knnr"){
                     Rook *r = dynamic_cast<Rook*>(this->board->at(0).at(7)->getPiece());
-                    if (!r->getMoved()){
+                    auto it = whiteTeamAvailableMoves->find("F8");
+                    if (!r->getMoved() && it == whiteTeamAvailableMoves->end()){
                         this->black->getKing()->setCastleRight(true);
                         r->setCastleLocation("F8");
                     }
@@ -763,9 +769,6 @@ class Chessboard{
                 for (int j = 0; j < 8; ++j){
                     Cell *c = this->board->at(i).at(j);
                     if (legalMoves.find(c->getName()) != legalMoves.end()){
-                        if (c->getPiece() == nullptr){
-                            c->setPrintStatus("\033[33m*\033[0m");
-                        }
                         if (c->getPiece() != nullptr){
                             if (turn % 2 == 0 && c->getPiece()->getTeam() == "black"){
                                 c->getPiece()->setStatus("checking");

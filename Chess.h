@@ -195,8 +195,8 @@ class Chess{
                         }
                     }
                     if (in_check){
-                    this->chessboard->removeCastleStatus();
-                    this->chessboard->generateAllMoves();
+                        this->chessboard->removeCastleStatus();
+                        this->chessboard->generateAllMoves();
                     }
                     std::set<std::string> all_legal_moves;
                     all_legal_moves = allLegalMoves(turn);
@@ -266,9 +266,8 @@ class Chess{
                     std::cout << "This piece does not belong to your team. Please choose a different one. \n";
                     continue;
                 }
-                if (this->chessboard->getWhiteTeam()->getKing()->getStatus() != "checked" && this->chessboard->getBlackTeam()->getKing()->getStatus() != "checked"){
-                    this->chessboard->showAvailableMoves(c1->getName());
-                }
+                this->chessboard->removeAvailableMoves();
+                this->chessboard->showAvailableMoves(c1->getName());
                 if (player_team == "white"){
                     this->chessboard->printBoard();
                 }
@@ -330,12 +329,6 @@ class Chess{
                     int points = this->chessboard->movePiece(c1, c2);
                     addPoints(points, turn);
                     if (this->chessboard->getPromotionAvailable()){
-                        if (player_team == "white"){
-                            this->chessboard->printBoard();
-                        }
-                        else{
-                            this->chessboard->printBoardReverse();
-                        }
                         if (turn %2 == 0){
                             this->chessboard->promote(this->chessboard->getWhiteTeam(), c2);
                         }
@@ -360,6 +353,10 @@ class Chess{
                     this->chessboard->removeCastleStatus();
                 }
             }
+            this->chessboard->getWhiteTeam()->getKing()->setStatus("captured");
+            this->chessboard->getBlackTeam()->getKing()->setStatus("captured");
+            this->chessboard->getWhiteTeam()->getKing()->changeColor();
+            this->chessboard->getBlackTeam()->getKing()->changeColor();
             if (player_team == "white"){
                     this->chessboard->printBoard();
                 }
