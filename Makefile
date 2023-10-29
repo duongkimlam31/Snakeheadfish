@@ -1,7 +1,4 @@
-run: main
-	./main 
-
-main: 
+all: 
 	g++ -std=c++14 -g -o main main.cc
 
 .PHONY:
