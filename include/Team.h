@@ -1,3 +1,5 @@
+#ifndef TEAM_H
+#define TEAM_H
 #include <string>
 #include <vector>
 
@@ -8,10 +10,6 @@
 #include "Pawn.h"
 #include "Queen.h"
 #include "Rook.h"
-
-#ifndef TEAM_H
-#define TEAM_H
-
 class Team {
  private:
   int points;

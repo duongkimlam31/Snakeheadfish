@@ -1,41 +1,54 @@
+#ifndef ROOK_H
+#define ROOK_H
 #include "Chesspiece.h"
 
-#ifndef BISHOP_H
-#define BISHOP_H
+class Rook : public Chesspiece {
+ private:
+  bool moved;
+  std::string castle_location;
 
-class Bishop : public Chesspiece {
  public:
-  Bishop() {
+  Rook() {
     this->team = "";
     this->points = 0;
     this->status = "";
     this->position = "";
-    this->name = "";
+    this->moved = false;
+    this->castle_location = "";
   }
-  Bishop(std::string name, std::string team, std::string position,
-         int points = 3) {
+  Rook(std::string name, std::string team, std::string position,
+       int points = 5) {
     this->name = name;
     this->team = team;
     this->points = points;
     this->status = "active";
     this->position = position;
+    this->moved = false;
+    this->castle_location = "";
     if (team == "black") {
-      this->icon = "\u2657";
+      this->icon = "\u2656";
     } else {
-      this->icon = "\u265D";
+      this->icon = "\u265C";
     }
   }
-  ~Bishop(){};
-
-  Bishop(const Bishop& other) {
+  ~Rook(){};
+  Rook(const Rook& other) {
     this->position = other.position;
     this->points = other.points;
     this->status = other.status;
     this->team = other.team;
     this->icon = other.icon;
     this->name = other.name;
+    this->moved = other.moved;
     this->availableMoves = other.availableMoves;
   }
+  void setMoved(bool moved) { this->moved = moved; }
+
+  void setCastleLocation(std::string castle_location) {
+    this->castle_location = castle_location;
+  }
+
+  bool getMoved() { return this->moved; }
 
   bool changeColor() {
     if (this->status == "threatened") {
@@ -49,9 +62,9 @@ class Bishop : public Chesspiece {
       return true;
     } else {
       if (team == "black") {
-        this->icon = "\u2657";
+        this->icon = "\u2656";
       } else {
-        this->icon = "\u265D";
+        this->icon = "\u265C";
       }
       return false;
     }
@@ -63,18 +76,17 @@ class Bishop : public Chesspiece {
     int col = int(col_name) - 65;
     int row = 7 - (int(row_name) - 49);
 
-    // move to the bottom right
+    // move to the bottom
     int i = row;
     int j = col;
-    while (i < 7 && j < 7) {
+    while (i < 7) {
       std::string currentCell = "";
-      currentCell += char(65 + j + 1);
+      currentCell += char(65 + j);
       currentCell += char(49 - i + 6);
 
       if (occupiedCells.find(currentCell) == occupiedCells.end()) {
         this->availableMoves.push_back(currentCell);
         ++i;
-        ++j;
       } else {
         if (this->team == "white" &&
             occupiedCells.find(currentCell)->second == "black") {
@@ -86,18 +98,16 @@ class Bishop : public Chesspiece {
         break;
       }
     }
-    // move to the bottom left
+    // move to the top
     i = row;
     j = col;
-    while (i < 7 && j > 0) {
+    while (i > 0) {
       std::string currentCell = "";
-      currentCell = "";
-      currentCell += char(65 + j - 1);
-      currentCell += char(49 - i + 6);
+      currentCell += char(65 + j);
+      currentCell += char(49 - i + 8);
       if (occupiedCells.find(currentCell) == occupiedCells.end()) {
         this->availableMoves.push_back(currentCell);
-        ++i;
-        --j;
+        --i;
       } else {
         if (this->team == "white" &&
             occupiedCells.find(currentCell)->second == "black") {
@@ -109,16 +119,15 @@ class Bishop : public Chesspiece {
         break;
       }
     }
-    // move to the top right
+    // move to the right
     i = row;
     j = col;
-    while (i > 0 && j < 7) {
+    while (j < 7) {
       std::string currentCell = "";
       currentCell += char(65 + j + 1);
-      currentCell += char(49 - i + 8);
+      currentCell += char(49 + (7 - i));
       if (occupiedCells.find(currentCell) == occupiedCells.end()) {
         this->availableMoves.push_back(currentCell);
-        --i;
         ++j;
       } else {
         if (this->team == "white" &&
@@ -131,16 +140,15 @@ class Bishop : public Chesspiece {
         break;
       }
     }
-    // move to the top left
+    // move to the left
     i = row;
     j = col;
-    while (i > 0 && j > 0) {
+    while (j > 0) {
       std::string currentCell = "";
       currentCell += char(65 + j - 1);
-      currentCell += char(49 - i + 8);
+      currentCell += char(49 + (7 - i));
       if (occupiedCells.find(currentCell) == occupiedCells.end()) {
         this->availableMoves.push_back(currentCell);
-        --i;
         --j;
       } else {
         if (this->team == "white" &&
@@ -152,6 +160,9 @@ class Bishop : public Chesspiece {
         }
         break;
       }
+    }
+    if (castle_location != "" && !moved) {
+      this->availableMoves.push_back(castle_location);
     }
   }
 };

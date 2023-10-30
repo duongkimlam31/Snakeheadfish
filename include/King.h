@@ -1,7 +1,6 @@
-#include "Chesspiece.h"
-
 #ifndef KING_H
 #define KING_H
+#include "Chesspiece.h"
 
 class King : public Chesspiece {
  private:

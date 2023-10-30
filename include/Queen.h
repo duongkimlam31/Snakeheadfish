@@ -1,6 +1,6 @@
-#include "Chesspiece.h"
 #ifndef QUEEN_H
 #define QUEEN_H
+#include "Chesspiece.h"
 
 class Queen : public Chesspiece {
  public:

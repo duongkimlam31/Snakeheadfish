@@ -1,3 +1,5 @@
+#ifndef CHESSBOARD_H
+#define CHESSBOARD_H
 #include <iostream>
 #include <set>
 #include <string>
@@ -8,9 +10,6 @@
 #include "Chesspiece.h"
 #include "Team.h"
 #include "cstring"
-
-#ifndef CHESSBOARD_H
-#define CHESSBOARD_H
 
 class Chessboard {
  private:

@@ -1,3 +1,5 @@
+#ifndef CELL_H
+#define CELL_H
 #include <string>
 #include <typeinfo>
 
@@ -8,9 +10,6 @@
 #include "Pawn.h"
 #include "Queen.h"
 #include "Rook.h"
-
-#ifndef CELL_H
-#define CELL_H
 
 class Cell {
  private:

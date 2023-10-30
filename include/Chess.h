@@ -1,3 +1,5 @@
+#ifndef GAME_H
+#define GAME_H
 #include <cctype>
 #include <string>
 #include <vector>
@@ -6,8 +8,6 @@
 
 #include "Chessboard.h"
 
-#ifndef GAME_H
-#define GAME_H
 class Chess {
  private:
   Chessboard *chessboard;
@@ -217,6 +217,7 @@ class Chess {
           stalemate = true;
           break;
         }
+        system("clear");
         if (player_team == "white") {
           this->chessboard->printBoard();
         } else {
@@ -271,6 +272,7 @@ class Chess {
       }
       this->chessboard->removeAvailableMoves();
       this->chessboard->showAvailableMoves(c1->getName());
+      system("clear");
       if (player_team == "white") {
         this->chessboard->printBoard();
       } else {
@@ -362,6 +364,7 @@ class Chess {
     this->chessboard->getBlackTeam()->getKing()->setStatus("captured");
     this->chessboard->getWhiteTeam()->getKing()->changeColor();
     this->chessboard->getBlackTeam()->getKing()->changeColor();
+    system("clear");
     if (player_team == "white") {
       this->chessboard->printBoard();
     } else {

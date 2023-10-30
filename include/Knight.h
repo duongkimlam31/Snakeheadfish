@@ -1,8 +1,6 @@
-#include "Chesspiece.h"
-
 #ifndef KNIGHT_H
 #define KNIGHT_H
-
+#include "Chesspiece.h"
 class Knight : public Chesspiece {
  public:
   Knight() {

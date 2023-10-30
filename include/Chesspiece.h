@@ -1,10 +1,9 @@
+#ifndef CHESSPIECE_H
+#define CHESSPIECE_H
 #include <iostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#ifndef CHESSPIECE_H
-#define CHESSPIECE_H
 
 class Chesspiece {
  protected:

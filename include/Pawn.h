@@ -1,6 +1,6 @@
-#include "Chesspiece.h"
 #ifndef PAWN_H
 #define PAWN_H
+#include "Chesspiece.h"
 
 class Pawn : public Chesspiece {
  private:

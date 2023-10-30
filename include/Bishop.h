@@ -1,55 +1,40 @@
+#ifndef BISHOP_H
+#define BISHOP_H
 #include "Chesspiece.h"
 
-#ifndef ROOK_H
-#define ROOK_H
-
-class Rook : public Chesspiece {
- private:
-  bool moved;
-  std::string castle_location;
-
+class Bishop : public Chesspiece {
  public:
-  Rook() {
+  Bishop() {
     this->team = "";
     this->points = 0;
     this->status = "";
     this->position = "";
-    this->moved = false;
-    this->castle_location = "";
+    this->name = "";
   }
-  Rook(std::string name, std::string team, std::string position,
-       int points = 5) {
+  Bishop(std::string name, std::string team, std::string position,
+         int points = 3) {
     this->name = name;
     this->team = team;
     this->points = points;
     this->status = "active";
     this->position = position;
-    this->moved = false;
-    this->castle_location = "";
     if (team == "black") {
-      this->icon = "\u2656";
+      this->icon = "\u2657";
     } else {
-      this->icon = "\u265C";
+      this->icon = "\u265D";
     }
   }
-  ~Rook(){};
-  Rook(const Rook& other) {
+  ~Bishop(){};
+
+  Bishop(const Bishop& other) {
     this->position = other.position;
     this->points = other.points;
     this->status = other.status;
     this->team = other.team;
     this->icon = other.icon;
     this->name = other.name;
-    this->moved = other.moved;
     this->availableMoves = other.availableMoves;
   }
-  void setMoved(bool moved) { this->moved = moved; }
-
-  void setCastleLocation(std::string castle_location) {
-    this->castle_location = castle_location;
-  }
-
-  bool getMoved() { return this->moved; }
 
   bool changeColor() {
     if (this->status == "threatened") {
@@ -63,9 +48,9 @@ class Rook : public Chesspiece {
       return true;
     } else {
       if (team == "black") {
-        this->icon = "\u2656";
+        this->icon = "\u2657";
       } else {
-        this->icon = "\u265C";
+        this->icon = "\u265D";
       }
       return false;
     }
@@ -77,58 +62,17 @@ class Rook : public Chesspiece {
     int col = int(col_name) - 65;
     int row = 7 - (int(row_name) - 49);
 
-    // move to the bottom
+    // move to the bottom right
     int i = row;
     int j = col;
-    while (i < 7) {
+    while (i < 7 && j < 7) {
       std::string currentCell = "";
-      currentCell += char(65 + j);
+      currentCell += char(65 + j + 1);
       currentCell += char(49 - i + 6);
 
       if (occupiedCells.find(currentCell) == occupiedCells.end()) {
         this->availableMoves.push_back(currentCell);
         ++i;
-      } else {
-        if (this->team == "white" &&
-            occupiedCells.find(currentCell)->second == "black") {
-          this->availableMoves.push_back(currentCell);
-        } else if (this->team == "black" &&
-                   occupiedCells.find(currentCell)->second == "white") {
-          this->availableMoves.push_back(currentCell);
-        }
-        break;
-      }
-    }
-    // move to the top
-    i = row;
-    j = col;
-    while (i > 0) {
-      std::string currentCell = "";
-      currentCell += char(65 + j);
-      currentCell += char(49 - i + 8);
-      if (occupiedCells.find(currentCell) == occupiedCells.end()) {
-        this->availableMoves.push_back(currentCell);
-        --i;
-      } else {
-        if (this->team == "white" &&
-            occupiedCells.find(currentCell)->second == "black") {
-          this->availableMoves.push_back(currentCell);
-        } else if (this->team == "black" &&
-                   occupiedCells.find(currentCell)->second == "white") {
-          this->availableMoves.push_back(currentCell);
-        }
-        break;
-      }
-    }
-    // move to the right
-    i = row;
-    j = col;
-    while (j < 7) {
-      std::string currentCell = "";
-      currentCell += char(65 + j + 1);
-      currentCell += char(49 + (7 - i));
-      if (occupiedCells.find(currentCell) == occupiedCells.end()) {
-        this->availableMoves.push_back(currentCell);
         ++j;
       } else {
         if (this->team == "white" &&
@@ -141,15 +85,17 @@ class Rook : public Chesspiece {
         break;
       }
     }
-    // move to the left
+    // move to the bottom left
     i = row;
     j = col;
-    while (j > 0) {
+    while (i < 7 && j > 0) {
       std::string currentCell = "";
+      currentCell = "";
       currentCell += char(65 + j - 1);
-      currentCell += char(49 + (7 - i));
+      currentCell += char(49 - i + 6);
       if (occupiedCells.find(currentCell) == occupiedCells.end()) {
         this->availableMoves.push_back(currentCell);
+        ++i;
         --j;
       } else {
         if (this->team == "white" &&
@@ -162,8 +108,49 @@ class Rook : public Chesspiece {
         break;
       }
     }
-    if (castle_location != "" && !moved) {
-      this->availableMoves.push_back(castle_location);
+    // move to the top right
+    i = row;
+    j = col;
+    while (i > 0 && j < 7) {
+      std::string currentCell = "";
+      currentCell += char(65 + j + 1);
+      currentCell += char(49 - i + 8);
+      if (occupiedCells.find(currentCell) == occupiedCells.end()) {
+        this->availableMoves.push_back(currentCell);
+        --i;
+        ++j;
+      } else {
+        if (this->team == "white" &&
+            occupiedCells.find(currentCell)->second == "black") {
+          this->availableMoves.push_back(currentCell);
+        } else if (this->team == "black" &&
+                   occupiedCells.find(currentCell)->second == "white") {
+          this->availableMoves.push_back(currentCell);
+        }
+        break;
+      }
+    }
+    // move to the top left
+    i = row;
+    j = col;
+    while (i > 0 && j > 0) {
+      std::string currentCell = "";
+      currentCell += char(65 + j - 1);
+      currentCell += char(49 - i + 8);
+      if (occupiedCells.find(currentCell) == occupiedCells.end()) {
+        this->availableMoves.push_back(currentCell);
+        --i;
+        --j;
+      } else {
+        if (this->team == "white" &&
+            occupiedCells.find(currentCell)->second == "black") {
+          this->availableMoves.push_back(currentCell);
+        } else if (this->team == "black" &&
+                   occupiedCells.find(currentCell)->second == "white") {
+          this->availableMoves.push_back(currentCell);
+        }
+        break;
+      }
     }
   }
 };
