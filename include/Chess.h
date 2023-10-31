@@ -185,8 +185,8 @@ class Chess {
       }
       if (!announced) {
         this->chessboard->generateAllMoves();
-        char *chess_state = this->chessboard->getFen(turn);
-        sendChessStateToPython(chess_state);
+        // char *chess_state = this->chessboard->getFen(turn);
+        // sendChessStateToPython(chess_state);
         if (turn % 2 == 0) {
           if (inCheck(turn, this->chessboard,
                       this->chessboard->getWhiteTeam()->getKing())) {
