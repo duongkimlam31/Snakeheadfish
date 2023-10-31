@@ -1,10 +1,11 @@
 #ifndef GAME_H
 #define GAME_H
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include <cctype>
 #include <string>
 #include <vector>
-#include <unistd.h>
-#include <sys/wait.h>
 
 #include "Chessboard.h"
 
@@ -158,14 +159,13 @@ class Chess {
     return all_legal_moves;
   }
 
-  void sendChessStateToPython(char *fen){
+  void sendChessStateToPython(char *fen) {
     pid_t pid;
     pid = fork();
-    if (pid != 0){
+    if (pid != 0) {
       wait(NULL);
-    }
-    else if (pid == 0){
-      execlp("python3", "python3", "chessAI.py", fen, NULL);
+    } else if (pid == 0) {
+      execlp("python3", "python3", "src/chessAI.py", fen, NULL);
     }
     free(fen);
   }
@@ -177,13 +177,19 @@ class Chess {
     bool checkmate = false;
     bool stalemate = false;
     bool in_check = false;
+    bool fifty_fifty_draw = false;
     while (true) {
-      // char *chess_state = this->chessboard->getFen(turn);
-      // sendChessStateToPython(chess_state);
+      if (this->chessboard->getHalfMove() == 50) {
+        fifty_fifty_draw = true;
+        break;
+      }
       if (!announced) {
         this->chessboard->generateAllMoves();
+        char *chess_state = this->chessboard->getFen(turn);
+        sendChessStateToPython(chess_state);
         if (turn % 2 == 0) {
-          if (inCheck(turn, this->chessboard, this->chessboard->getWhiteTeam()->getKing())) {
+          if (inCheck(turn, this->chessboard,
+                      this->chessboard->getWhiteTeam()->getKing())) {
             in_check = true;
             this->chessboard->getWhiteTeam()->getKing()->setStatus("checked");
             this->chessboard->getWhiteTeam()->getKing()->changeColor();
@@ -217,7 +223,7 @@ class Chess {
           stalemate = true;
           break;
         }
-        system("clear");
+        // system("clear");
         if (player_team == "white") {
           this->chessboard->printBoard();
         } else {
@@ -225,9 +231,11 @@ class Chess {
         }
       }
       if (turn % 2 != 0 && !announced) {
+        std::cout << "Enter 0 to exit.\n";
         std::cout << "Black team's turn: \n";
         announced = true;
       } else if (turn % 2 == 0 && !announced) {
+        std::cout << "Enter 0 to exit.\n";
         std::cout << "White team's turn: \n";
         announced = true;
       }
@@ -272,7 +280,7 @@ class Chess {
       }
       this->chessboard->removeAvailableMoves();
       this->chessboard->showAvailableMoves(c1->getName());
-      system("clear");
+      // system("clear");
       if (player_team == "white") {
         this->chessboard->printBoard();
       } else {
@@ -364,13 +372,15 @@ class Chess {
     this->chessboard->getBlackTeam()->getKing()->setStatus("captured");
     this->chessboard->getWhiteTeam()->getKing()->changeColor();
     this->chessboard->getBlackTeam()->getKing()->changeColor();
-    system("clear");
+    // system("clear");
     if (player_team == "white") {
       this->chessboard->printBoard();
     } else {
       this->chessboard->printBoardReverse();
     }
-    if (stalemate) {
+    if (fifty_fifty_draw) {
+      std::cout << "Draw" << std::endl;
+    } else if (stalemate) {
       std::cout << "Stalemate" << std::endl;
     } else if (turn % 2 != 0 && checkmate) {
       std::cout << "Checkmate" << std::endl;

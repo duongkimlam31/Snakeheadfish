@@ -13,6 +13,8 @@
 
 class Chessboard {
  private:
+  Team *white;
+  Team *black;
   std::vector<std::vector<Cell *>> *board =
       new std::vector<std::vector<Cell *>>;
   std::unordered_map<std::string, std::string> *occupiedCells =
@@ -22,8 +24,9 @@ class Chessboard {
   bool promotionAvailable;
   std::string enPassantAvailable;
   std::string enPassantPawn;
-  Team *white;
-  Team *black;
+  int full_move;
+  int half_move;
+  char fen_en_passant_location[3];
 
  public:
   Chessboard() {
@@ -42,6 +45,9 @@ class Chessboard {
     this->enPassantPawn = "";
     this->white = new Team("white");
     this->black = new Team("black");
+    this->half_move = 0;
+    this->full_move = 1;
+    strcpy(this->fen_en_passant_location, "-");
   }
   ~Chessboard() {
     delete white;
@@ -405,6 +411,9 @@ class Chessboard {
   std::unordered_map<std::string, std::string> *getOccupiedCells() {
     return this->occupiedCells;
   }
+  int getHalfMove(){
+    return this->half_move;
+  }
   void findOccupiedCells() {
     for (int i = 0; i < 8; ++i) {
       for (int j = 0; j < 8; ++j) {
@@ -497,12 +506,14 @@ class Chessboard {
   }
 
   int movePiece(Cell *starting_location, Cell *destination) {
+    strcpy(this->fen_en_passant_location, "-");
     std::string starting_location_name = starting_location->getName();
     std::string destination_name = destination->getName();
     std::vector<std::string> available_moves =
         starting_location->getPiece()->getAvailableMoves();
     bool canMove = false;
     int points = 0;
+    this->half_move++;
     for (int i = 0; i < available_moves.size(); ++i) {
       if (available_moves.at(i) == destination_name) {
         canMove = true;
@@ -522,7 +533,24 @@ class Chessboard {
 
       Chesspiece *tmp = starting_location->getPiece();
       tmp->setPosition(destination_name);
-
+      if (tmp->getTeam() == "black"){
+        this->full_move++;
+      }
+      if (tmp->getName().find("Pawn") != std::string::npos){
+        this->half_move = 0;
+        if (abs(start_row - des_row) == 2){
+          char tmp_start_row = '\0';
+          if (tmp->getTeam() == "white"){
+            tmp_start_row = char(49 + 2);
+          }
+          else{
+            tmp_start_row = char(49 + 5);
+          }
+          this->fen_en_passant_location[0] = tolower(des_col_name);
+          this->fen_en_passant_location[1] = tmp_start_row;
+          this->fen_en_passant_location[2] = '\0';
+        }
+      }
       this->board->at(start_row).at(start_col)->setPiece(nullptr);
       if (tmp->getName().find("King") != std::string::npos) {
         King *k = dynamic_cast<King *>(tmp);
@@ -566,6 +594,7 @@ class Chessboard {
       if (destination->getPiece() != nullptr) {
         destination->getPiece()->setStatus("captured");
         points = destination->getPiece()->getPoints();
+        this->half_move = 0;
       }
       if (tmp->getTeam() == "white" &&
           tmp->getName().find("Pawn") != std::string::npos &&
@@ -815,7 +844,7 @@ class Chessboard {
     }
   }
   char *getFen(int turn){
-    char fen[80] = "\0";
+    char fen[90] = "\0";
     for (int i = 0; i < 8; ++i){
       int empty_space = 0;
       for (int j = 0; j < 8; ++j){
@@ -844,7 +873,7 @@ class Chessboard {
             piece = 'Q';
           }
           if (current_cell->getPiece()->getName().find("King") != std::string::npos){
-            piece = 'R';
+            piece = 'K';
           }
           if (current_cell->getPiece()->getTeam() == "black"){
             piece = tolower(piece);
@@ -899,6 +928,16 @@ class Chessboard {
       strcat(fen, " ");
       strcat(fen, castle_status);
     }
+    strcat(fen, " ");
+    strcat(fen, this->fen_en_passant_location);
+    char fen_half_move[2];
+    sprintf(fen_half_move, "%d", this->half_move);
+    char fen_full_move[2];
+    sprintf(fen_full_move, "%d", this->full_move);
+    strcat(fen, " ");
+    strcat(fen, fen_half_move);
+    strcat(fen, " ");
+    strcat(fen, fen_full_move);
     char* result = (char*) malloc(strlen(fen) + 1);
     strcpy(result, fen);
     return result;

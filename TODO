@@ -1,0 +1,4 @@
+Handle promotion input from python and in python
+Threefold repetition
+Insufficient material
+if there is one or no available opening move, no need to call minimax on it
