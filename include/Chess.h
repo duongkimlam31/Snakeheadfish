@@ -159,15 +159,27 @@ class Chess {
     return all_legal_moves;
   }
 
-  void sendChessStateToPython(char *fen) {
+  char *sendChessStateToPython(char *fen) {
+    int fd[2];
+    pipe(fd);
     pid_t pid;
+    char *move = (char*)malloc(sizeof(char)*5);
     pid = fork();
     if (pid != 0) {
+      close(fd[1]);
       wait(NULL);
+      char buffer[5];
+      read(fd[0], buffer, 4);
+      strcpy(move, buffer);
+      close(fd[0]);
     } else if (pid == 0) {
-      execlp("python3", "python3", "src/chessAI.py", fen, NULL);
+      close(fd[0]);
+      char write_end[2];
+      sprintf(write_end, "%d", fd[1]);
+      execlp("python3", "python3", "src/chessAI.py", fen, write_end, NULL);
     }
     free(fen);
+    return move;
   }
 
   void start(std::string player_team) {
@@ -178,6 +190,16 @@ class Chess {
     bool stalemate = false;
     bool in_check = false;
     bool fifty_fifty_draw = false;
+    bool player_turn;
+    bool nextTurn;
+    Cell *c1 = NULL;
+    Cell *c2 = NULL;
+    if (player_team == "white"){
+      player_turn = true;
+    }
+    else{
+      player_turn = false;
+    }
     while (true) {
       if (this->chessboard->getHalfMove() == 50) {
         fifty_fifty_draw = true;
@@ -185,8 +207,6 @@ class Chess {
       }
       if (!announced) {
         this->chessboard->generateAllMoves();
-        // char *chess_state = this->chessboard->getFen(turn);
-        // sendChessStateToPython(chess_state);
         if (turn % 2 == 0) {
           if (inCheck(turn, this->chessboard,
                       this->chessboard->getWhiteTeam()->getKing())) {
@@ -230,120 +250,145 @@ class Chess {
           this->chessboard->printBoardReverse();
         }
       }
-      if (turn % 2 != 0 && !announced) {
-        std::cout << "Enter 0 to exit.\n";
-        std::cout << "Black team's turn: \n";
-        announced = true;
-      } else if (turn % 2 == 0 && !announced) {
-        std::cout << "Enter 0 to exit.\n";
-        std::cout << "White team's turn: \n";
-        announced = true;
-      }
-      std::cout << "Choose a square: ";
-      std::cin >> input;
-      if (input == "0") {
-        break;
-      }
-      if (input.size() != 2) {
-        std::cout << "Invalid Input. Please try again. \n";
-        continue;
-      }
-      char col_name = input.at(0);
-      if (!isalpha(col_name)) {
-        std::cout << "Invalid Input. Please try again. \n";
-        continue;
-      }
-      col_name = toupper(col_name);
-      if (col_name < 'A' or col_name > 'H') {
-        std::cout << "Invalid Input. Please try again. \n";
-        continue;
-      }
-      char row_name = input.at(1);
-      if (!isdigit(row_name) or row_name < '1' or row_name > '8') {
-        std::cout << "Invalid Input. Please try again. \n";
-        continue;
-      }
-      Cell *c1 = this->chessboard->getCell(input);
-      if (this->chessboard->getCell(input)->getPiece() == nullptr) {
-        std::cout << "This cell is empty. Please try a different cell. \n";
-        continue;
-      }
-      if (turn % 2 == 0 && c1->getPiece()->getTeam() != "white") {
-        std::cout << "This piece does not belong to your team. Please choose a "
-                     "different one. \n";
-        continue;
-      }
-      if (turn % 2 != 0 && c1->getPiece()->getTeam() != "black") {
-        std::cout << "This piece does not belong to your team. Please choose a "
-                     "different one. \n";
-        continue;
-      }
-      this->chessboard->removeAvailableMoves();
-      this->chessboard->showAvailableMoves(c1->getName());
-      // system("clear");
-      if (player_team == "white") {
-        this->chessboard->printBoard();
-      } else {
-        this->chessboard->printBoardReverse();
-      }
-      std::string input_move;
-      bool nextTurn = false;
-      bool announced_2 = false;
-      while (true) {
-        if (!announced_2) {
-          std::cout << "Press 1 to go back." << std::endl;
-          announced_2 = true;
+      if (player_turn){
+        if (turn % 2 != 0 && !announced) {
+          std::cout << "Enter 0 to exit.\n";
+          std::cout << "Black team's turn: \n";
+          announced = true;
+        } else if (turn % 2 == 0 && !announced) {
+          std::cout << "Enter 0 to exit.\n";
+          std::cout << "White team's turn: \n";
+          announced = true;
         }
         std::cout << "Choose a square: ";
-        std::cin >> input_move;
-        if (input_move == "1") {
-          this->chessboard->removeAvailableMoves();
-          announced = false;
+        getline(std::cin, input);
+        if (input == "0") {
           break;
         }
-        bool canMove = false;
-        if (input_move.size() != 2) {
+        if (input.size() != 2) {
           std::cout << "Invalid Input. Please try again. \n";
           continue;
         }
-        char col_name_move = input_move.at(0);
-        if (!isalpha(col_name_move)) {
+        char col_name = input.at(0);
+        if (!isalpha(col_name)) {
           std::cout << "Invalid Input. Please try again. \n";
           continue;
         }
-        col_name_move = toupper(col_name_move);
-        if (col_name_move < 'A' or col_name_move > 'H') {
+        col_name = toupper(col_name);
+        if (col_name < 'A' or col_name > 'H') {
           std::cout << "Invalid Input. Please try again. \n";
           continue;
         }
-        char row_name_move = input_move.at(1);
-        if (!isdigit(row_name_move) or row_name_move < '1' or
-            row_name_move > '8') {
+        char row_name = input.at(1);
+        if (!isdigit(row_name) or row_name < '1' or row_name > '8') {
           std::cout << "Invalid Input. Please try again. \n";
           continue;
         }
-        std::vector<std::string> legalMoveChecks =
-            c1->getPiece()->getAvailableMoves();
-        for (int i = 0; i < legalMoveChecks.size(); ++i) {
-          if (toupper(legalMoveChecks.at(i).at(0)) ==
-                  toupper(input_move.at(0)) &&
-              legalMoveChecks.at(i).at(1) == input_move.at(1)) {
-            canMove = true;
+        c1 = this->chessboard->getCell(input);
+        if (this->chessboard->getCell(input)->getPiece() == nullptr) {
+          std::cout << "This cell is empty. Please try a different cell. \n";
+          continue;
+        }
+        if (turn % 2 == 0 && c1->getPiece()->getTeam() != "white") {
+          std::cout << "This piece does not belong to your team. Please choose a "
+                      "different one. \n";
+          continue;
+        }
+        if (turn % 2 != 0 && c1->getPiece()->getTeam() != "black") {
+          std::cout << "This piece does not belong to your team. Please choose a "
+                      "different one. \n";
+          continue;
+        }
+        this->chessboard->removeAvailableMoves();
+        this->chessboard->showAvailableMoves(c1->getName());
+        // system("clear");
+        if (player_team == "white") {
+          this->chessboard->printBoard();
+        } else {
+          this->chessboard->printBoardReverse();
+        }
+        std::string input_move;
+        nextTurn = false;
+        bool announced_2 = false;
+        while (true) {
+          if (!announced_2) {
+            std::cout << "Press 1 to go back." << std::endl;
+            announced_2 = true;
+          }
+          std::cout << "Choose a square: ";
+          getline(std::cin, input_move);
+          if (input_move == "1") {
+            this->chessboard->removeAvailableMoves();
+            announced = false;
             break;
           }
-        }
-        if (canMove) {
-          nextTurn = true;
-          break;
-        } else {
-          std::cout << "That move is not legal. Please try again. \n";
+          bool canMove = false;
+          if (input_move.size() != 2) {
+            std::cout << "Invalid Input. Please try again. \n";
+            continue;
+          }
+          char col_name_move = input_move.at(0);
+          if (!isalpha(col_name_move)) {
+            std::cout << "Invalid Input. Please try again. \n";
+            continue;
+          }
+          col_name_move = toupper(col_name_move);
+          if (col_name_move < 'A' or col_name_move > 'H') {
+            std::cout << "Invalid Input. Please try again. \n";
+            continue;
+          }
+          char row_name_move = input_move.at(1);
+          if (!isdigit(row_name_move) or row_name_move < '1' or
+              row_name_move > '8') {
+            std::cout << "Invalid Input. Please try again. \n";
+            continue;
+          }
+          std::vector<std::string> legalMoveChecks =
+              c1->getPiece()->getAvailableMoves();
+          for (int i = 0; i < legalMoveChecks.size(); ++i) {
+            if (toupper(legalMoveChecks.at(i).at(0)) ==
+                    toupper(input_move.at(0)) &&
+                legalMoveChecks.at(i).at(1) == input_move.at(1)) {
+              canMove = true;
+              break;
+            }
+          }
+          if (canMove) {
+            nextTurn = true;
+            c2 = this->chessboard->getCell(input_move);
+            player_turn = false;
+            break;
+          } else {
+            std::cout << "That move is not legal. Please try again. \n";
+          }
         }
       }
+      else{
+        // system("clear");
+        if (player_team == "white") {
+          this->chessboard->printBoard();
+        } else {
+          this->chessboard->printBoardReverse();
+        }
+        char *chess_state = this->chessboard->getFen(turn);
+        char *move = sendChessStateToPython(chess_state);
+        printf("%s\n", move);
+        std::string starting_location = "";
+        std::string destination = "";
+        starting_location += move[0];
+        starting_location += move[1];
+        destination += move[2];
+        destination += move[3];
+        c1 = this->chessboard->getCell(starting_location);
+        c2 = this->chessboard->getCell(destination);
+        free(move);
+        player_turn = true;
+        nextTurn = true;
+      }
       if (nextTurn) {
-        Cell *c2 = this->chessboard->getCell(input_move);
         int points = this->chessboard->movePiece(c1, c2);
         addPoints(points, turn);
-        if (this->chessboard->getPromotionAvailable()) {
+        if (this->chessboard->getPromotionAvailable() && player_turn) {
           if (turn % 2 == 0) {
             this->chessboard->promote(this->chessboard->getWhiteTeam(), c2);
           } else {
@@ -360,7 +405,7 @@ class Chess {
           this->chessboard->getWhiteTeam()->getKing()->setStatus("active");
           this->chessboard->getWhiteTeam()->getKing()->changeColor();
         } else if (this->chessboard->getBlackTeam()->getKing()->getStatus() ==
-                   "checked") {
+                  "checked") {
           this->chessboard->getBlackTeam()->getKing()->setStatus("active");
           this->chessboard->getBlackTeam()->getKing()->changeColor();
         }
