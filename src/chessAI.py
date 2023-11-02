@@ -8,7 +8,6 @@ import os
 import pickle
 import time
 
-
 class Chess:
     def __init__(self, state = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"):
         self.state = state
@@ -153,7 +152,7 @@ if __name__ == "__main__":
     # if os.path.isfile("transposition_table.bin") and os.path.getsize("transposition_table.bin") > 0:
     #     hash_file = open("transposition_table.bin", "rb")
     #     game.transposition_table = pickle.load(hash_file)
-    move = game.iterative_deepening_minimax(30,5)
+    move = game.iterative_deepening_minimax(10,5)
     # print(move)
     # move = game.minimax(game.state, 5)
     write_end = int(sys.argv[2])

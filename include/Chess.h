@@ -367,6 +367,7 @@ class Chess {
         }
       }
       else{
+        std::cout << "Thinking...\n\n";
         char *chess_state = this->chessboard->getFen(turn);
         char *move = sendChessStateToPython(chess_state);
         std::string starting_location = "";

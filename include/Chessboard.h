@@ -928,7 +928,7 @@ class Chessboard {
       }
     }
     if (castle_status != ""){
-      strcat(fen, " ");
+      strcat(fen, "-");
       strcat(fen, castle_status);
     }
     strcat(fen, " ");

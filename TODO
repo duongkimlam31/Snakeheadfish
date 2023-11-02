@@ -14,4 +14,5 @@ Since alpha-beta pruning is affected by the position of the generated states, ma
 Allow the user to go back to the previous state
 Terminal state: checkmate, stalemate, Insufficient material
 Zobrist key
-# A progam that tests the AI against stockfish
+A progam that tests the AI against stockfish
+Improve move ordering function
