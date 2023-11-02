@@ -5,13 +5,18 @@ import chess.polyglot
 import chess.syzygy
 import sys
 import os
+import pickle
 import time
 
 
 class Chess:
-    def __init__(self, state = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", cutoff_depth = 3):
+    def __init__(self, state = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", cutoff_depth = 7):
         self.board = chess.Board(state)
         self.cutoff_depth = cutoff_depth
+        self.timer = 0
+        self.time_limit = 0
+        self.current_move = ""
+        self.current_eval = None
         self.transposition_table = {}
         self.opening_book_reader_1 = chess.polyglot.open_reader("book_openings/standard_opening_book.bin")
         self.opening_book_reader_2 = chess.polyglot.open_reader("book_openings/titans_opening_book.bin")
@@ -36,10 +41,18 @@ class Chess:
             openings.append(str(entry.move))
         if len(openings) != 0:
             return openings
-        return [str(move) for move in new_board.legal_moves]
+        ordered_list = []
+        for move in new_board.legal_moves:
+            destination = chess.parse_square(str(move)[2:])
+            if (new_board.is_attacked_by(new_board.turn, destination)):
+                ordered_list.insert(0, str(move))
+            else:
+                ordered_list.append(str(move))
+        return ordered_list
     def result(self, state, action):
         new_board = chess.Board(state)
         new_board.push_san(action)
+        # handle promotion & castling here
         return new_board.fen()
     def isCutoff(self, state, depth):
         new_board = chess.Board(state)
@@ -48,12 +61,12 @@ class Chess:
         return False
     def eval(self, state):
         new_board = chess.Board(state)
-        if new_board.is_checkmate() or new_board.is_stalemate():
+        if new_board.is_checkmate():
             if new_board.turn == chess.WHITE:
                 return float("-inf")
             else:
                 return float("inf")
-        elif new_board.is_insufficient_material() or new_board.can_claim_draw() or new_board.is_fivefold_repetition():
+        elif new_board.is_insufficient_material() or new_board.can_claim_draw() or new_board.is_fivefold_repetition() or new_board.is_stalemate():
           return 0
         pieces = {}
         for square in chess.SQUARES:
@@ -82,13 +95,19 @@ class Chess:
             elif piece == "q":
                 eval_score += -9 * pieces[piece]
         return eval_score
-    def minimax(self, state):
+    def minimax(self, state, time_limit):
+        self.time_limit = time_limit
+        self.timer = time.time() + time_limit
+        self.current_move = ""
+        self.current_eval = None
         if self.toMove(state) == chess.WHITE:
             value, move = self.max_value_abc(state, float("-inf"), float("inf"), 0)
         else:
             value, move = self.min_value_abc(state, float("-inf"), float("inf"), 0)
         return move
     def max_value_abc(self, state, alpha, beta, depth):
+        if time.time()  >= self.timer and self.current_move != "" and self.current_eval != None:
+            return self.current_eval, self.current_move
         tmp_state = chess.Board(state)
         zobrist = chess.polyglot.zobrist_hash(tmp_state)
         if zobrist in self.transposition_table:
@@ -103,11 +122,19 @@ class Chess:
                 val, move = v2, a
                 alpha = max(val, alpha)
             if val >= beta:
-                self.transposition_table[zobrist] = [val, move]
+                self.transposition_table[zobrist] = [val, move, depth]
+                if self.current_eval == None or self.current_eval >= val:
+                    self.current_eval = val
+                    self.current_move = move
                 return val, move
         self.transposition_table[zobrist] = [val, move]
+        if self.current_eval == None or self.current_eval >= val:
+            self.current_eval = val
+            self.current_move = move
         return val, move
     def min_value_abc(self, state, alpha, beta, depth):
+        if time.time() >= self.timer and self.current_move != "" and self.current_eval != None:
+            return self.current_eval, self.current_move
         tmp_state = chess.Board(state)
         zobrist = chess.polyglot.zobrist_hash(tmp_state)
         if zobrist in self.transposition_table:
@@ -123,17 +150,24 @@ class Chess:
                 beta = min(val, beta)
             if val <= alpha:
                 self.transposition_table[zobrist] = [val, move]
+                if self.current_eval == None or self.current_eval <= val:
+                    self.current_eval = val
+                    self.current_move = move
                 return val, move
         self.transposition_table[zobrist] = [val, move]
+        if  self.current_eval == None or self.current_eval <= val:
+            self.current_eval = val
+            self.current_move = move
         return val, move
-        
             
 if __name__ == "__main__":
     game = Chess(sys.argv[1])
+    if os.path.isfile("transposition_table.bin") and os.path.getsize("transposition_table.bin") > 0:
+        hash_file = open("transposition_table.bin", "rb")
+        game.transposition_table = pickle.load(hash_file)
     board = game.board
-    move = game.minimax(board.fen())
+    move = game.minimax(board.fen(), 5)
     write_end = int(sys.argv[2])
-    print(write_end)
     pipe = os.fdopen(write_end, "w")
 
     # Write data to the pipe
@@ -142,6 +176,9 @@ if __name__ == "__main__":
 
     # Close the pipe
     pipe.close()
+    hash_file = open("transposition_table.bin", "wb")
+    pickle.dump(game.transposition_table, hash_file)
+    
     # # Create a new chess board
 
     # # board = chess.Board()
@@ -191,5 +228,4 @@ if __name__ == "__main__":
 
     # # Zobrist hashing
     # # chess.polyglot.zobrist_hash(board)
-
 

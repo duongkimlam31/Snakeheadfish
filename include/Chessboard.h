@@ -540,15 +540,18 @@ class Chessboard {
         this->half_move = 0;
         if (abs(start_row - des_row) == 2){
           char tmp_start_row = '\0';
-          if (tmp->getTeam() == "white"){
+          if (tmp->getTeam() == "white" && this->enPassantAvailable == "black"){
             tmp_start_row = char(49 + 2);
+            this->fen_en_passant_location[0] = tolower(des_col_name);
+            this->fen_en_passant_location[1] = tmp_start_row;
+            this->fen_en_passant_location[2] = '\0';
           }
-          else{
+          else if (tmp->getTeam() == "black" && this->enPassantAvailable == "white"){
             tmp_start_row = char(49 + 5);
+            this->fen_en_passant_location[0] = tolower(des_col_name);
+            this->fen_en_passant_location[1] = tmp_start_row;
+            this->fen_en_passant_location[2] = '\0';
           }
-          this->fen_en_passant_location[0] = tolower(des_col_name);
-          this->fen_en_passant_location[1] = tmp_start_row;
-          this->fen_en_passant_location[2] = '\0';
         }
       }
       this->board->at(start_row).at(start_col)->setPiece(nullptr);

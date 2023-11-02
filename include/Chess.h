@@ -2,6 +2,7 @@
 #define GAME_H
 #include <sys/wait.h>
 #include <unistd.h>
+ #include <fcntl.h>
 
 #include <cctype>
 #include <string>
@@ -194,6 +195,8 @@ class Chess {
     bool nextTurn;
     Cell *c1 = NULL;
     Cell *c2 = NULL;
+    int fd = open("transposition_table.bin", O_TRUNC | O_CREAT);
+    close(fd);
     if (player_team == "white"){
       player_turn = true;
     }
@@ -372,7 +375,6 @@ class Chess {
         }
         char *chess_state = this->chessboard->getFen(turn);
         char *move = sendChessStateToPython(chess_state);
-        printf("%s\n", move);
         std::string starting_location = "";
         std::string destination = "";
         starting_location += move[0];
