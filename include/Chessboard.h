@@ -847,7 +847,7 @@ class Chessboard {
     }
   }
   char *getFen(int turn){
-    char fen[90] = "\0";
+    char fen[100] = "\0";
     for (int i = 0; i < 8; ++i){
       int empty_space = 0;
       for (int j = 0; j < 8; ++j){

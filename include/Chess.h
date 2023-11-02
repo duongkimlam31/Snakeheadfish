@@ -367,12 +367,6 @@ class Chess {
         }
       }
       else{
-        // system("clear");
-        if (player_team == "white") {
-          this->chessboard->printBoard();
-        } else {
-          this->chessboard->printBoardReverse();
-        }
         char *chess_state = this->chessboard->getFen(turn);
         char *move = sendChessStateToPython(chess_state);
         std::string starting_location = "";
