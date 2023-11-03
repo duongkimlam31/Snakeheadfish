@@ -84,15 +84,17 @@ class Chess:
     def isCutoff(self, board, depth, cutoff_depth):
         if board.is_checkmate() or board.is_stalemate() or board.is_insufficient_material() or board.can_claim_draw() or board.is_fivefold_repetition():
             return True
-        if cutoff_depth == depth:
-            board.push(chess.Move.null())
+        if cutoff_depth <= depth:
             val_1 = self.eval(board)
+            board.push(chess.Move.null())
             for move in board.legal_moves:
                 tmp_board = board.copy()
+                team = self.toMove(tmp_board)
                 tmp_board.push(move)
                 val_2 = self.eval(tmp_board)
-                if abs(val_1) - abs(val_2) >= 3:
-                    print(abs(val_1) - abs(val_2))
+                if  val_1 - val_2 <= -3 and team == chess.BLACK:
+                    return False
+                elif val_1 - val_2 >= 3 and team == chess.WHITE:
                     return False
             return True
         return False
@@ -224,7 +226,7 @@ class Chess:
 if __name__ == "__main__":
     game = Chess(sys.argv[1])
     begin = time.time()
-    move = game.iterative_deepening_minimax(20, 10)
+    move = game.iterative_deepening_minimax(200, 10)
     end = time.time()
     print("Total run time:", abs(begin-end), "seconds")
     # print(move)
