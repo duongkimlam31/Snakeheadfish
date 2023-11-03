@@ -16,3 +16,4 @@ Terminal state: checkmate, stalemate, Insufficient material
 Zobrist key
 A progam that tests the AI against stockfish
 Improve move ordering function
+Implement null move pruning. Should not apply null move pruning in the end game because has a lot of zugswang

@@ -927,8 +927,12 @@ class Chessboard {
         }
       }
     }
-    if (castle_status != ""){
+    if (castle_status == ""){
+      strcat(fen, " ");
       strcat(fen, "-");
+    }
+    else{
+      strcat(fen, " ");
       strcat(fen, castle_status);
     }
     strcat(fen, " ");
