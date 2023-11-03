@@ -82,7 +82,18 @@ class Chess:
         # handle promotion here
         return tmp_board
     def isCutoff(self, board, depth, cutoff_depth):
-        if board.is_checkmate() or board.is_stalemate() or board.is_insufficient_material() or board.can_claim_draw() or board.is_fivefold_repetition() or cutoff_depth == depth:
+        if board.is_checkmate() or board.is_stalemate() or board.is_insufficient_material() or board.can_claim_draw() or board.is_fivefold_repetition():
+            return True
+        if cutoff_depth == depth:
+            board.push(chess.Move.null())
+            val_1 = self.eval(board)
+            for move in board.legal_moves:
+                tmp_board = board.copy()
+                tmp_board.push(move)
+                val_2 = self.eval(tmp_board)
+                if abs(val_1) - abs(val_2) >= 3:
+                    print(abs(val_1) - abs(val_2))
+                    return False
             return True
         return False
     def eval(self, board):
@@ -196,7 +207,7 @@ class Chess:
                 return val, move
         self.transposition_table[zobrist] = [val, move]
         return val, move
-    
+
     def has_non_pawn_material(self, board):
         non_pawn_material = {
             chess.KNIGHT: 3,
@@ -212,11 +223,8 @@ class Chess:
     
 if __name__ == "__main__":
     game = Chess(sys.argv[1])
-    # if os.path.isfile("transposition_table.bin") and os.path.getsize("transposition_table.bin") > 0:
-    #     hash_file = open("transposition_table.bin", "rb")
-    #     game.transposition_table = pickle.load(hash_file)
     begin = time.time()
-    move = game.iterative_deepening_minimax(200, 4)
+    move = game.iterative_deepening_minimax(20, 10)
     end = time.time()
     print("Total run time:", abs(begin-end), "seconds")
     # print(move)
@@ -230,8 +238,6 @@ if __name__ == "__main__":
 
     # Close the pipe
     pipe.close()
-    # hash_file = open("transposition_table.bin", "wb")
-    # pickle.dump(game.transposition_table, hash_file)
     
     # # Create a new chess board
 
@@ -282,4 +288,3 @@ if __name__ == "__main__":
 
     # # Zobrist hashing
     # # chess.polyglot.zobrist_hash(board)
-
