@@ -195,8 +195,8 @@ class Chess {
     bool nextTurn;
     Cell *c1 = NULL;
     Cell *c2 = NULL;
-    // int fd = open("transposition_table.bin", O_TRUNC | O_CREAT);
-    // close(fd);
+    int fd = open("transposition_table.bin", O_TRUNC | O_CREAT);
+    close(fd);
     if (player_team == "white"){
       player_turn = true;
     }

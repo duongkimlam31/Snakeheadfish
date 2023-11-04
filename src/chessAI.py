@@ -8,6 +8,11 @@ import os
 import pickle
 import time
 import signal
+import random
+
+UPPERBOUND = 1
+EXACT = 0
+LOWERBOUND = -1
 
 class TimeoutError(Exception):
     """
@@ -15,7 +20,6 @@ class TimeoutError(Exception):
     """
 
     pass
-
 
 class Timeout:
     """
@@ -37,75 +41,61 @@ class Timeout:
     def __exit__(self, type, value, traceback):
         signal.alarm(0)
         
-class Chess:
+class SnakeheadFish:
     def __init__(self, state = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"):
         self.board = chess.Board(state)
-        self.opening_phase = True
-        self.nodes = 0
-        self.pruned_nodes = 0
         self.transposition_table = {}
         self.opening_book_reader_1 = chess.polyglot.open_reader("book_openings/standard_opening_book.bin")
         self.opening_book_reader_2 = chess.polyglot.open_reader("book_openings/titans_opening_book.bin")
         self.opening_book_reader_3 = chess.polyglot.open_reader("book_openings/komodo.bin")
         self.opening_book_reader_4 = chess.polyglot.open_reader("book_openings/gm2001.bin")
         self.opening_book_reader_5 = chess.polyglot.open_reader("book_openings/rodent.bin")
+        
     def toMove(self, board):
         return board.turn
+    
     def actions(self, board):
         # prune endgame legal actions here
         openings = []
         for entry in self.opening_book_reader_1.find_all(board):
-            openings.append(str(entry.move))
+            openings.append(entry.move)
         for entry in self.opening_book_reader_2.find_all(board):
-            openings.append(str(entry.move))
+            openings.append(entry.move)
         for entry in self.opening_book_reader_3.find_all(board):
-            openings.append(str(entry.move))
+            openings.append(entry.move)
         for entry in self.opening_book_reader_4.find_all(board):
-            openings.append(str(entry.move))
+            openings.append(entry.move)
         for entry in self.opening_book_reader_5.find_all(board):
-            openings.append(str(entry.move))
+            openings.append(entry.move)
         if len(openings) != 0:
             return openings
         ordered_list = []
         for move in board.legal_moves:
-            if len(str(move)) != 4:
-                continue
-            destination = chess.parse_square(str(move)[2:])
+            destination = move.to_square
             if (board.is_attacked_by(board.turn, destination)):
-                ordered_list.insert(0, str(move))
+                ordered_list.insert(0, move)
             else:
-                ordered_list.append(str(move))
+                ordered_list.append(move)
         return ordered_list
+    
     def result(self, board, action):
         tmp_board = board.copy()
-        tmp_board.push_san(action)
-        # handle promotion here
+        tmp_board.push(action)
         return tmp_board
-    def isCutoff(self, board, depth, cutoff_depth):
-        if board.is_checkmate() or board.is_stalemate() or board.is_insufficient_material() or board.can_claim_draw() or board.is_fivefold_repetition():
-            return True
-        if cutoff_depth <= depth:
-            val_1 = self.eval(board)
-            board.push(chess.Move.null())
-            for move in board.legal_moves:
-                tmp_board = board.copy()
-                team = self.toMove(tmp_board)
-                tmp_board.push(move)
-                val_2 = self.eval(tmp_board)
-                if  val_1 - val_2 <= -3 and team == chess.BLACK:
-                    return False
-                elif val_1 - val_2 >= 3 and team == chess.WHITE:
-                    return False
+    
+    def isCutoff(self, board):
+        if board.is_checkmate() or board.is_stalemate() or board.is_insufficient_material() or board.can_claim_draw() or board.is_fivefold_repetition() or board.is_variant_end():
             return True
         return False
+    
     def eval(self, board):
         if board.is_checkmate():
             if board.turn == chess.WHITE:
                 return float("-inf")
             else:
                 return float("inf")
-        elif board.is_insufficient_material() or board.can_claim_draw() or board.is_fivefold_repetition() or board.is_stalemate():
-          return 0
+        elif board.is_stalemate() or board.is_insufficient_material() or board.can_claim_draw() or board.is_fivefold_repetition() or board.is_variant_end():
+            return 0
         pieces = {}
         for square in chess.SQUARES:
             piece = board.piece_at(square)
@@ -133,113 +123,118 @@ class Chess:
             elif piece == "q":
                 eval_score += -9 * pieces[piece]
         return eval_score
-    def iterative_deepening_minimax(self, time_limit, max_depth):
+    
+    def iterative_deepening_minimax(self, board, time_limit, max_depth):
         move = ""
+        tmp_board = board.copy()
         for cutoff_depth in range(1,max_depth+1):
             with Timeout(time_limit):
                 try:
-                    self.transposition_table = {}
-                    move = self.minimax(self.board, cutoff_depth)
+                    # self.transposition_table = {}
+                    move = self.find_move(tmp_board, cutoff_depth)
                 except:
                     if move == "":
-                        move = self.minimax(self.board, cutoff_depth)
+                        move = self.find_move(tmp_board, cutoff_depth)
                     break
         return move
-    def minimax(self, board, cutoff_depth):
-        if self.toMove(board) == chess.WHITE:
-            value, move = self.max_value_abc(board, float("-inf"), float("inf"), 0, cutoff_depth)
-        else:
-            value, move = self.min_value_abc(board, float("-inf"), float("inf"), 0, cutoff_depth)
-        return move
-    def max_value_abc(self, board, alpha, beta, depth, cutoff_depth, allow_null = True):
-        self.nodes += 1
-        tmp_state = board.copy()
-        zobrist = chess.polyglot.zobrist_hash(tmp_state)
-        if zobrist in self.transposition_table:
-            return self.transposition_table[zobrist][0], self.transposition_table[zobrist][1]
-        if self.isCutoff(tmp_state, depth, cutoff_depth):
-            return self.eval(tmp_state), ""
-        if depth + 3 <= cutoff_depth and not tmp_state.is_check() and allow_null and self.has_non_pawn_material(tmp_state):
-            tmp_state.push(chess.Move.null())
-            val, move = -self.min_value_abc(tmp_state, alpha, beta, depth + 3, cutoff_depth, False)
-            tmp_state.pop()
-            if val >= beta:
-                self.pruned_nodes += 1
-                self.transposition_table[zobrist] = [val, move]
-                return val, move
-        val = float("-inf")
-        move = ""
-        for a in self.actions(tmp_state):
-            v2, a2 = self.min_value_abc(self.result(tmp_state, a), alpha, beta, depth+1, cutoff_depth)
-            if v2 > val:
-                val, move = v2, a
-                alpha = max(val, alpha)
-            if val >= beta:
-                self.transposition_table[zobrist] = [val, move]
-                self.pruned_nodes += 1
-                return val, move
-        self.transposition_table[zobrist] = [val, move]
-        return val, move
-    def min_value_abc(self, board, alpha, beta, depth, cutoff_depth, allow_null = True):
-        self.nodes += 1
-        tmp_state = board.copy()
-        zobrist = chess.polyglot.zobrist_hash(tmp_state)
-        if zobrist in self.transposition_table:
-            return self.transposition_table[zobrist][0], self.transposition_table[zobrist][1]
-        if self.isCutoff(tmp_state, depth, cutoff_depth):
-            return self.eval(tmp_state), ""
-        if depth + 3 <= cutoff_depth and not tmp_state.is_check() and allow_null and self.has_non_pawn_material(tmp_state):
-            tmp_state.push(chess.Move.null())
-            val, move = -self.max_value_abc(tmp_state, alpha, beta, depth + 3, cutoff_depth, False)
-            tmp_state.pop()
-            if val <= alpha:
-                self.pruned_nodes += 1
-                self.transposition_table[zobrist] = [val, move]
-                return val, move
-        val = float("inf")
-        move = ""
-        for a in self.actions(tmp_state):
-            v2, a2 = self.max_value_abc(self.result(tmp_state, a), alpha, beta, depth + 1, cutoff_depth)
-            if v2 < val:
-                val, move = v2, a
-                beta = min(val, beta)
-            if val <= alpha:
-                self.pruned_nodes += 1
-                self.transposition_table[zobrist] = [val, move]
-                return val, move
-        self.transposition_table[zobrist] = [val, move]
-        return val, move
-
-    def has_non_pawn_material(self, board):
-        non_pawn_material = {
-            chess.KNIGHT: 3,
-            chess.BISHOP: 3,
-            chess.ROOK: 5,
-            chess.QUEEN: 9
-        }
-        total_non_pawn_material = 0
-        for square, piece in board.piece_map().items():
-            if piece.piece_type in non_pawn_material:
-                total_non_pawn_material += non_pawn_material[piece.piece_type]
-        return total_non_pawn_material >= 10
     
-if __name__ == "__main__":
-    game = Chess(sys.argv[1])
+    def quiescent_search(self, board, alpha, beta):
+        stand_pat = self.eval(board)
+        if stand_pat >= beta:
+            return beta
+        if alpha < stand_pat:
+            alpha = stand_pat
+        legal_captures = [move for move in board.legal_moves if board.is_capture(move)]
+        for capture in legal_captures:
+            score = -self.quiescent_search(self.result(board, capture),-beta, -alpha)
+            if score >= beta:
+                return beta
+            if score > alpha:
+                alpha = score
+        return alpha
+    
+    def alpha_beta_negamax(self, board, alpha, beta, depth, turn_multiplier, allow_null_move_prune=True):
+        tmp_board = board.copy()
+        original_alpha = alpha
+        zobrist_key = chess.polyglot.zobrist_hash(tmp_board)
+        if zobrist_key in self.transposition_table and self.transposition_table[zobrist_key][1] >= depth:
+            if self.transposition_table[zobrist_key][2] == EXACT:
+                return self.transposition_table[zobrist_key][0]
+            elif self.transposition_table[zobrist_key][2] == LOWERBOUND:
+                alpha = max(alpha, self.transposition_table[zobrist_key][0])
+            elif self.transposition_table[zobrist_key][2] == UPPERBOUND:
+                beta = min(beta, self.transposition_table[zobrist_key][0])
+        if alpha >= beta:
+            return self.transposition_table[zobrist_key][0]
+        if self.isCutoff(board):
+            return self.eval(board) * turn_multiplier
+        if depth == 0:
+            return self.quiescent_search(tmp_board, alpha, beta)
+        if allow_null_move_prune and not tmp_board.is_check() and depth >= 3:
+            print(4)
+            tmp_board.push(chess.Move.null())
+            val = -self.alpha_beta_negamax(tmp_board, -beta, -beta + 1, depth - 3, -turn_multiplier, False)
+            tmp_board.pop()
+            if(val >= beta):
+                return val
+        val = float("-inf")
+        for move in self.actions(board):
+            val = max(val, -self.alpha_beta_negamax(self.result(tmp_board, move), -beta, -alpha, depth - 1, -turn_multiplier))
+            alpha = max(alpha, val)
+            if alpha >= beta:
+                break
+        self.transposition_table[zobrist_key] = [None, None, None]
+        self.transposition_table[zobrist_key][0] = val
+        if val <= original_alpha:
+            self.transposition_table[zobrist_key][2] = UPPERBOUND
+        elif val >= beta:
+            self.transposition_table[zobrist_key][2] = LOWERBOUND
+        else:
+            self.transposition_table[zobrist_key][2] = EXACT
+        self.transposition_table[zobrist_key][1] = depth
+        return val
+    
+    def find_move(self, board, depth):
+        tmp_board = board.copy()
+        if self.toMove(tmp_board) == chess.WHITE:
+            turn_multiplier = 1
+        else:
+            turn_multiplier = -1
+        alpha = float('-inf')
+        beta = float('inf')
+        
+        best_evaluation = float("-inf")
+        best_move = ""
+        for move in self.actions(tmp_board):
+            evaluation = -self.alpha_beta_negamax(self.result(tmp_board, move), -beta, -alpha, depth-1, turn_multiplier)
+            if evaluation > best_evaluation:
+                best_evaluation = evaluation
+                best_move = move
+            alpha = max(alpha, evaluation)
+        return best_move
+            
+if __name__ == "__main__":    
+    ai = SnakeheadFish(sys.argv[1])
+    if os.path.isfile("transposition_table.bin") and os.path.getsize("transposition_table.bin") > 0:
+        hash_file = open("transposition_table.bin", "rb")
+        ai.transposition_table = pickle.load(hash_file)
     begin = time.time()
-    move = game.iterative_deepening_minimax(200, 10)
+    move = ai.iterative_deepening_minimax(ai.board, 100, 5)
     end = time.time()
     print("Total run time:", abs(begin-end), "seconds")
-    # print(move)
-    # move = game.minimax(game.state, 5)
+    # move = ai.minimax(ai.state, 5)
     write_end = int(sys.argv[2])
     pipe = os.fdopen(write_end, "w")
 
     # Write data to the pipe
-    pipe.write(move)
+    pipe.write(str(move))
     pipe.flush()  # Flush the buffer to ensure data is sent immediately
 
     # Close the pipe
     pipe.close()
+
+    hash_file = open("transposition_table.bin", "wb")
+    pickle.dump(ai.transposition_table, hash_file)
     
     # # Create a new chess board
 

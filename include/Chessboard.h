@@ -927,13 +927,13 @@ class Chessboard {
         }
       }
     }
-    if (strcmp(castle_status, "") == 0){
+    if (castle_status != ""){
       strcat(fen, " ");
-      strcat(fen, "-");
+      strcat(fen, castle_status);
     }
     else{
       strcat(fen, " ");
-      strcat(fen, castle_status);
+      strcat(fen, "-");
     }
     strcat(fen, " ");
     strcat(fen, this->fen_en_passant_location);
