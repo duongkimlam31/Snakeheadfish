@@ -1,3 +1,5 @@
 #Executables
 chess
-transposition_table.bin
+tables/transposition_table.bin
+tables/history_table.bin
+tables
