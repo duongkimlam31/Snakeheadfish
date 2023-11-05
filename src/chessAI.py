@@ -50,6 +50,7 @@ class SnakeheadFish:
         self.opening_book_reader_3 = chess.polyglot.open_reader("book_openings/komodo.bin")
         self.opening_book_reader_4 = chess.polyglot.open_reader("book_openings/gm2001.bin")
         self.opening_book_reader_5 = chess.polyglot.open_reader("book_openings/rodent.bin")
+        self.nodes_traversed = 0
         
     def toMove(self, board):
         return board.turn
@@ -69,14 +70,21 @@ class SnakeheadFish:
             openings.append(entry.move)
         if len(openings) != 0:
             return openings
-        ordered_list = []
-        for move in board.legal_moves:
-            destination = move.to_square
-            if (board.is_attacked_by(board.turn, destination)):
-                ordered_list.insert(0, move)
+        return list(board.legal_moves)
+    
+    def mvv_lva_sort(self, board, move):
+        mvv = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3, chess.ROOK: 5,chess.QUEEN: 9, chess.KING: 0}
+        lva = {chess.PAWN: 9, chess.KNIGHT: 5, chess.BISHOP: 5, chess.ROOK: 3,chess.QUEEN: 1, chess.KING: 0}
+        if board.is_capture(move):
+            victim_square = board.piece_at(move.to_square)
+            aggressor_square = board.piece_at(move.from_square)
+            if victim_square != None:
+                victim = victim_square.piece_type
+                aggressor = aggressor_square.piece_type
+                return mvv[victim] + lva[aggressor]
             else:
-                ordered_list.append(move)
-        return ordered_list
+                return 1
+        return 0
     
     def result(self, board, action):
         tmp_board = board.copy()
@@ -104,33 +112,22 @@ class SnakeheadFish:
                     pieces[piece.symbol()] = 1
                 else:
                     pieces[piece.symbol()] += 1
+        piece_value = {"P": 1, "p": -1, "N": 3, "n": -3 ,"B": 3, "b": -3 ,"R": 5, "r": -5, "Q": 9, "q": -9, "K": 0, "k": 0}
         eval_score = 0
         for piece in pieces:
-            if piece == "P":
-                eval_score += 1 * pieces[piece]
-            elif piece == "p":
-                eval_score += -1 * pieces[piece]
-            elif piece == "R":
-                eval_score += 5 * pieces[piece]
-            elif piece == "r":
-                eval_score += -5 * pieces[piece]
-            elif piece == "N" or piece == "B":
-                eval_score += 3 * pieces[piece]
-            elif piece == "n" or piece == "b":
-                eval_score += -3 * pieces[piece]
-            elif piece == "Q":
-                eval_score += 9 * pieces[piece]
-            elif piece == "q":
-                eval_score += -9 * pieces[piece]
-        return eval_score
+            eval_score += piece_value[piece] * pieces[piece]
+        if self.toMove(board) == chess.WHITE:
+            return eval_score
+        else:
+            return -eval_score
     
     def iterative_deepening_minimax(self, board, time_limit, max_depth):
         move = ""
         tmp_board = board.copy()
         for cutoff_depth in range(1,max_depth+1):
+            print(cutoff_depth)
             with Timeout(time_limit):
                 try:
-                    # self.transposition_table = {}
                     move = self.find_move(tmp_board, cutoff_depth)
                 except:
                     if move == "":
@@ -138,23 +135,31 @@ class SnakeheadFish:
                     break
         return move
     
-    def quiescent_search(self, board, alpha, beta):
+    def quiescence_search(self, board, alpha, beta):
+        self.nodes_traversed += 1
         stand_pat = self.eval(board)
         if stand_pat >= beta:
             return beta
         if alpha < stand_pat:
             alpha = stand_pat
         legal_captures = [move for move in board.legal_moves if board.is_capture(move)]
+        legal_captures.sort(key=lambda move: self.mvv_lva_sort(board, move))
+        legal_captures.reverse()
         for capture in legal_captures:
-            score = -self.quiescent_search(self.result(board, capture),-beta, -alpha)
+            score = -self.quiescence_search(self.result(board, capture),-beta, -alpha)
             if score >= beta:
                 return beta
             if score > alpha:
                 alpha = score
         return alpha
-    
-    def alpha_beta_negamax(self, board, alpha, beta, depth, turn_multiplier, allow_null_move_prune=True):
+
+    def alpha_beta_negamax(self, board, alpha, beta, depth, allow_null_move_prune=True):
+        self.nodes_traversed += 1
         tmp_board = board.copy()
+        if self.isCutoff(tmp_board):
+            return self.eval(tmp_board)
+        if depth == 0:
+            return self.quiescence_search(tmp_board, alpha, beta)
         original_alpha = alpha
         zobrist_key = chess.polyglot.zobrist_hash(tmp_board)
         if zobrist_key in self.transposition_table and self.transposition_table[zobrist_key][1] >= depth:
@@ -164,27 +169,37 @@ class SnakeheadFish:
                 alpha = max(alpha, self.transposition_table[zobrist_key][0])
             elif self.transposition_table[zobrist_key][2] == UPPERBOUND:
                 beta = min(beta, self.transposition_table[zobrist_key][0])
-        if alpha >= beta:
-            return self.transposition_table[zobrist_key][0]
-        if self.isCutoff(board):
-            return self.eval(board) * turn_multiplier
-        if depth == 0:
-            return self.quiescent_search(tmp_board, alpha, beta)
-        if allow_null_move_prune and not tmp_board.is_check() and depth >= 3:
-            print(4)
+            if alpha >= beta:
+                return self.transposition_table[zobrist_key][0]
+        if allow_null_move_prune and not tmp_board.is_check() and depth >= 3 and not (beta-alpha > 1):
             tmp_board.push(chess.Move.null())
-            val = -self.alpha_beta_negamax(tmp_board, -beta, -beta + 1, depth - 3, -turn_multiplier, False)
+            val = -self.alpha_beta_negamax(tmp_board, -beta, -beta + 1, depth - 3, False)
             tmp_board.pop()
             if(val >= beta):
                 return val
         val = float("-inf")
-        for move in self.actions(board):
-            val = max(val, -self.alpha_beta_negamax(self.result(tmp_board, move), -beta, -alpha, depth - 1, -turn_multiplier))
+        legal_moves = self.actions(tmp_board)
+        legal_moves.sort(key=lambda move: self.mvv_lva_sort(tmp_board, move))
+        legal_moves.reverse()
+        moves_searched = 0
+        for move in legal_moves:
+            if moves_searched == 0:
+                val = max(val, -self.alpha_beta_negamax(self.result(tmp_board, move), -beta, -alpha, depth - 1))
+            else:
+                if moves_searched >= 4 and depth >= 3:
+                    if not tmp_board.is_check() and not (beta-alpha > 1) and not tmp_board.is_capture(move) and not move.promotion:
+                        val = -self.alpha_beta_negamax(self.result(tmp_board, move), -(alpha + 1), -alpha, depth - 2)
+                else:
+                    val = alpha + 1
+                if val > alpha:
+                    val = -self.alpha_beta_negamax(self.result(tmp_board, move), -(alpha+1), -alpha, depth - 1)
+                    if val > alpha and val < beta:
+                        val = -self.alpha_beta_negamax(self.result(tmp_board, move), -beta, -alpha, depth - 1)
             alpha = max(alpha, val)
             if alpha >= beta:
                 break
+            moves_searched += 1
         self.transposition_table[zobrist_key] = [None, None, None]
-        self.transposition_table[zobrist_key][0] = val
         if val <= original_alpha:
             self.transposition_table[zobrist_key][2] = UPPERBOUND
         elif val >= beta:
@@ -192,26 +207,21 @@ class SnakeheadFish:
         else:
             self.transposition_table[zobrist_key][2] = EXACT
         self.transposition_table[zobrist_key][1] = depth
+        self.transposition_table[zobrist_key][0] = val
         return val
     
     def find_move(self, board, depth):
-        tmp_board = board.copy()
-        if self.toMove(tmp_board) == chess.WHITE:
-            turn_multiplier = 1
-        else:
-            turn_multiplier = -1
+        best_evaluated_move = None
+        best_value = float('-inf')
         alpha = float('-inf')
         beta = float('inf')
-        
-        best_evaluation = float("-inf")
-        best_move = ""
-        for move in self.actions(tmp_board):
-            evaluation = -self.alpha_beta_negamax(self.result(tmp_board, move), -beta, -alpha, depth-1, turn_multiplier)
-            if evaluation > best_evaluation:
-                best_evaluation = evaluation
-                best_move = move
-            alpha = max(alpha, evaluation)
-        return best_move
+        for move in board.legal_moves:
+            boardValue = -self.alpha_beta_negamax(self.result(board, move), -beta, -alpha, depth - 1)
+            if boardValue > best_value:
+                best_value = boardValue
+                best_evaluated_move = move
+            alpha = max(alpha, boardValue)
+        return best_evaluated_move
             
 if __name__ == "__main__":    
     ai = SnakeheadFish(sys.argv[1])
@@ -219,10 +229,10 @@ if __name__ == "__main__":
         hash_file = open("transposition_table.bin", "rb")
         ai.transposition_table = pickle.load(hash_file)
     begin = time.time()
-    move = ai.iterative_deepening_minimax(ai.board, 100, 5)
+    move = ai.iterative_deepening_minimax(ai.board, 20, 6)
     end = time.time()
     print("Total run time:", abs(begin-end), "seconds")
-    # move = ai.minimax(ai.state, 5)
+    print("Total traversed nodes:", ai.nodes_traversed)
     write_end = int(sys.argv[2])
     pipe = os.fdopen(write_end, "w")
 
@@ -235,29 +245,6 @@ if __name__ == "__main__":
 
     hash_file = open("transposition_table.bin", "wb")
     pickle.dump(ai.transposition_table, hash_file)
-    
-    # # Create a new chess board
-
-    # # board = chess.Board()
-    # # board2 = board.copy()
-    # board = chess.Board(sys.argv[1])
-
-    # # Print the initial chessboard
-    # # print(board.fen)
-
-    # # List all legal moves from the current position
-    # # legal_moves = list(board.legal_moves)
-    # # print("Legal moves:", legal_moves)
-
-    # # Make a move 
-    # # board.push_san("e2e4")
-    # # print(board.fen)
-
-    # # Book openings 
-    # # return NULL if empty
-
-
-    # # print(board)
 
     # # Syzygy table for the endgame 
     # # return NULL if empty

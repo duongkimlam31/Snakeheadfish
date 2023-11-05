@@ -1,19 +1,10 @@
 Handle promotion input from python and in python
 Threefold repetition
 Fivefold repetition
-Insufficient material
-if there is one or no available opening move, no need to call minimax on it
 If in the early game, use the book opening for minimax 
 If in the late game(3-5 pieces total), use the endgame tablebase
-Alpha-beta pruning minimax that cuts off the search at a given depth
-Search depth should be dependent on the game mode
-Also cut off at the repeated states and keep track of repeated states in a tranposition table
-Do not cut off at the quiescent states, make a quiescent search function to handle this 
 Do more research on the horizon effect
-Since alpha-beta pruning is affected by the position of the generated states, make a function that sorts the states in the order of attacking to not attacking 
 Allow the user to go back to the previous state
-Terminal state: checkmate, stalemate, Insufficient material
-Zobrist key
 A progam that tests the AI against stockfish
 Improve move ordering function
 Implement null move pruning. Should not apply null move pruning in the end game because has a lot of zugswang
@@ -24,3 +15,8 @@ Implement null move pruning. Should not apply null move pruning in the end game 
     
 # hash_file = open("transposition_table.bin", "wb")
 # pickle.dump(game.transposition_table, hash_file)
+
+SEE for the main search 
+mvv-lva for the quiescent search
+
+history heuristic and killer heuristic
