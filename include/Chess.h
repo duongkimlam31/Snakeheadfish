@@ -2,7 +2,8 @@
 #define GAME_H
 #include <sys/wait.h>
 #include <unistd.h>
- #include <fcntl.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #include <cctype>
 #include <string>
@@ -195,6 +196,10 @@ class Chess {
     bool nextTurn;
     Cell *c1 = NULL;
     Cell *c2 = NULL;
+    if (mkdir("./tables", S_IRWXU | S_IRWXG | S_IRWXO) == -1 && errno != EEXIST){
+        perror("Can't create output directory\n");
+        exit(-1);
+    }
     int tt = open("tables/transposition_table.bin", O_TRUNC | O_CREAT, S_IRWXU);
     close(tt);
     int ht = open("tables/history_table.bin", O_TRUNC | O_CREAT, S_IRWXU);
