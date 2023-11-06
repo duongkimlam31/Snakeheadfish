@@ -199,8 +199,8 @@ class Chess {
     close(tt);
     int ht = open("tables/history_table.bin", O_TRUNC | O_CREAT, S_IRWXU);
     close(ht);
-    int kmt = open("tables/killer_moves_table.bin", O_TRUNC | O_CREAT, S_IRWXU)
-    close(kmt)
+    int gst = open("tables/game_state_table.bin", O_TRUNC | O_CREAT, S_IRWXU);
+    close(gst);
     if (player_team == "white"){
       player_turn = true;
     }

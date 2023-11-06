@@ -1,5 +1,4 @@
 #Executables
 chess
-tables/transposition_table.bin
-tables/history_table.bin
 tables
+src/__pycache__
