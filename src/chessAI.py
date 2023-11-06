@@ -270,8 +270,6 @@ class SnakeheadFish:
         best_move = None
         for move in legal_moves:
             best_move = move
-            if move == None:
-                print(12313231)
             # Futility pruning
             if depth == 1 and allow_futility_prune and moves_searched != 0 and not tmp_board.is_capture(move) and not move.promotion:
                 tmp_board.push(move)

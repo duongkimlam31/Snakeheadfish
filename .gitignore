@@ -1,5 +1,7 @@
 #Executables
 chess
-tables
+tables/game_state_table.bin
+tables/history_table.bin
+tables/transposition_table.bin
 src/__pycache__
 generate_tests.py
