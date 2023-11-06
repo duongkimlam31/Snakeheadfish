@@ -389,7 +389,7 @@ class Chess {
       if (nextTurn) {
         int points = this->chessboard->movePiece(c1, c2);
         addPoints(points, turn);
-        if (this->chessboard->getPromotionAvailable() && player_turn) {
+        if (this->chessboard->getPromotionAvailable() && !player_turn) {
           if (turn % 2 == 0) {
             this->chessboard->promote(this->chessboard->getWhiteTeam(), c2);
           } else {

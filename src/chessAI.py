@@ -14,6 +14,8 @@ UPPERBOUND = 1
 EXACT = 0
 LOWERBOUND = -1
 
+ASPIRATION_WINDOW_CUT = 50
+
 
 class TimeoutError(Exception):
     """
@@ -44,21 +46,17 @@ class Timeout:
         
 class SnakeheadFish:
     def __init__(self, search_depth = 6, search_time = 10, state = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"):
-        self.board = chess.Board(state)
         self.transposition_table = {}
         self.killer_moves_table = {}
         self.history_table = {chess.WHITE: [[0 for _ in range(64)] for _ in range(64)], chess.BLACK : [[0 for _ in range(64)] for _ in range(64)]}
-        self.opening_book_reader_1 = chess.polyglot.open_reader("book_openings/standard_opening_book.bin")
-        self.opening_book_reader_2 = chess.polyglot.open_reader("book_openings/titans_opening_book.bin")
-        self.opening_book_reader_3 = chess.polyglot.open_reader("book_openings/komodo.bin")
-        self.opening_book_reader_4 = chess.polyglot.open_reader("book_openings/gm2001.bin")
-        self.opening_book_reader_5 = chess.polyglot.open_reader("book_openings/rodent.bin")
+        self.opening_book_reader = chess.polyglot.MemoryMappedReader("book_openings/titans_opening_book.bin")
+        self.syzygy_tablebase =chess.syzygy.open_tablebase("./3-4-5_pieces_Syzygy")
         self.nodes_traversed = 0
         self.search_depth = search_depth
         self.search_time = search_time
         self.middle_game_table, self.end_game_table = piece_square_tables.init_table()
         self.gamephaseInc = [0,0,1,1,1,1,2,2,4,4,0,0]
-        
+        self.futility_margin = [0, 100, 300, 500]
         for depth in range(self.search_depth):
             self.killer_moves_table[depth] = [None for _ in range(2)]
         
@@ -66,22 +64,9 @@ class SnakeheadFish:
         return board.turn
     
     def actions(self, board):
-        # prune endgame legal actions here
-        openings = []
-        for entry in self.opening_book_reader_1.find_all(board):
-            openings.append(entry.move)
-        for entry in self.opening_book_reader_2.find_all(board):
-            openings.append(entry.move)
-        for entry in self.opening_book_reader_3.find_all(board):
-            openings.append(entry.move)
-        for entry in self.opening_book_reader_4.find_all(board):
-            openings.append(entry.move)
-        for entry in self.opening_book_reader_5.find_all(board):
-            openings.append(entry.move)
-        if len(openings) != 0:
-            return openings
-        return list(board.legal_moves)
-    
+        legal_moves = list(board.legal_moves)
+        return legal_moves
+        
     def get_ordered_moves(self, board):
         legal_captures = [move for move in self.actions(board) if board.is_capture(move)]
         legal_non_captures = [move for move in self.actions(board) if not board.is_capture(move)]
@@ -119,6 +104,9 @@ class SnakeheadFish:
         return False
     
     def eval(self, board):
+        dtz = self.syzygy_tablebase.get_dtz(board)
+        if dtz != None:
+            return dtz
         mg = {}
         eg = {}
         gamePhase = 0
@@ -146,19 +134,46 @@ class SnakeheadFish:
         val_2 = (mgScore * mgPhase + egScore * egPhase) / 24
         return val_2
     
-    def iterative_deepening_minimax(self, board):
-        move = None
-        tmp_board = board.copy()
-        for cutoff_depth in range(1,self.search_depth+1):
-            print(cutoff_depth)
+    def iterative_deepening_search(self, board):
+        opening_move = None
+        try:
+            opening_move = self.opening_book_reader.weighted_choice(board).move
+            return opening_move
+        except:
+            move = None
+            best_value = float('-inf')
+            alpha = float('-inf')
+            beta = float('inf')
+            legal_captures, legal_non_captures = self.get_ordered_moves(board.copy())
+            legal_moves = legal_captures + legal_non_captures
+            cutoff_depth = 1
             with Timeout(self.search_time):
                 try:
-                    move = self.find_move(tmp_board)
+                    while cutoff_depth <= self.search_depth:
+                        for a in legal_moves:
+                            val = -self.alpha_beta_negamax(self.result(board.copy(), a), -beta, -alpha, cutoff_depth - 1, 1)
+                            if val > best_value:
+                                best_value = val
+                                move = a
+                        # Aspiration Window 
+                        if best_value <= alpha or best_value >= beta:
+                            alpha = float("-inf")
+                            beta = float("inf")
+                            continue
+                        alpha = best_value - ASPIRATION_WINDOW_CUT
+                        beta = best_value + ASPIRATION_WINDOW_CUT
+                        if val == float("inf") and move != None:
+                            break
+                        cutoff_depth += 1
                 except:
-                    if move == None:
-                        move = self.find_move(tmp_board)
-                    break
-        return move
+                    if not move:
+                        for a in legal_moves:
+                            val = -self.alpha_beta_negamax(self.result(board.copy(), a), -beta, -alpha, cutoff_depth - 1, 1)
+                            if val > best_value:
+                                best_value = val
+                                move = a
+                            alpha = max(alpha, best_value)
+            return move
     
     def quiescence_search(self, board, alpha, beta):
         self.nodes_traversed += 1
@@ -198,12 +213,38 @@ class SnakeheadFish:
                 beta = min(beta, self.transposition_table[zobrist_key][0])
             if alpha >= beta:
                 return self.transposition_table[zobrist_key][0]
-        if allow_null_move_prune and not tmp_board.is_check() and depth >= 3 and not (beta-alpha > 1):
-            tmp_board.push(chess.Move.null())
-            val = -self.alpha_beta_negamax(tmp_board, -beta, -beta + 1, depth - 3, ply + 3, False)
-            tmp_board.pop()
-            if(val >= beta):
-                return val
+        static_eval = self.eval(tmp_board)
+        # If not a pv-node and not in check
+        allow_futility_prune = False
+        if not (beta-alpha > 1) and not tmp_board.is_check():
+            # null-move pruning
+            if allow_null_move_prune and depth >= 3:
+                tmp_board.push(chess.Move.null())
+                val = -self.alpha_beta_negamax(tmp_board, -beta, -beta + 1, depth - 3, ply + 3, False)
+                tmp_board.pop()
+                if(val >= beta):
+                    return val
+            # Razoring
+            razor_score = static_eval + 1
+            q_score = self.quiescence_search(tmp_board, alpha, beta)
+            if razor_score < beta:
+                if depth == 1:
+                    if q_score > razor_score:
+                        return q_score
+                    else:
+                        return razor_score
+            razor_score += 1
+            if razor_score < beta and depth < 4:
+                if q_score < beta:
+                    if q_score > razor_score:
+                        return q_score
+                    else:
+                        return razor_score
+            if depth < 4 and alpha != float("inf") and alpha != float("-inf") and beta != float("inf") and beta != float("-inf") and (static_eval + self.futility_margin[depth]) <= alpha:
+                allow_futility_prune = True
+        # Internal iterative deepening
+        if depth >= 5 and (beta-alpha > 1):
+            depth -= 1
         val = float("-inf")
         # Sort move using mvv-lva and history heuristic
         legal_captures, legal_non_captures = self.get_ordered_moves(tmp_board)
@@ -229,14 +270,30 @@ class SnakeheadFish:
         best_move = None
         for move in legal_moves:
             best_move = move
+            if move == None:
+                print(12313231)
+            # Futility pruning
+            if depth == 1 and allow_futility_prune and moves_searched != 0 and not tmp_board.is_capture(move) and not move.promotion:
+                tmp_board.push(move)
+                if not tmp_board.is_check():
+                    tmp_board.pop()
+                    try:
+                        previous_move = tmp_board.pop()
+                        if not tmp_board.is_capture(previous_move):
+                            tmp_board.push(previous_move)
+                            continue
+                    except:
+                        pass
             if moves_searched == 0:
                 val = max(val, -self.alpha_beta_negamax(self.result(tmp_board, move), -beta, -alpha, depth - 1, ply + 1))
+            # Late move reductions
             else:
                 if moves_searched >= 4 and depth >= 3:
                     if not tmp_board.is_check() and not (beta-alpha > 1) and not tmp_board.is_capture(move) and not move.promotion:
                         val = -self.alpha_beta_negamax(self.result(tmp_board, move), -(alpha + 1), -alpha, depth - 2, ply + 2)
                 else:
                     val = alpha + 1
+                # PV-search
                 if val > alpha:
                     val = -self.alpha_beta_negamax(self.result(tmp_board, move), -(alpha+1), -alpha, depth - 1, ply + 1)
                     if val > alpha and val < beta:
@@ -273,7 +330,9 @@ class SnakeheadFish:
         best_value = float('-inf')
         alpha = float('-inf')
         beta = float('inf')
-        for move in board.legal_moves:
+        legal_captures, legal_non_captures = self.get_ordered_moves(board.copy())
+        legal_moves = legal_captures + legal_non_captures
+        for move in legal_moves:
             boardValue = -self.alpha_beta_negamax(self.result(board, move), -beta, -alpha, self.search_depth - 1, 1)
             if boardValue > best_value:
                 best_value = boardValue
@@ -282,7 +341,8 @@ class SnakeheadFish:
         return best_evaluated_move
             
 if __name__ == "__main__":    
-    ai = SnakeheadFish(3, 100, sys.argv[1])
+    chessboard = chess.Board(sys.argv[1])
+    ai = SnakeheadFish(6, 100)
     if os.path.isfile("tables/transposition_table.bin") and os.path.getsize("tables/transposition_table.bin") > 0:
         transposition_table_file = open("tables/transposition_table.bin", "rb")
         ai.transposition_table = pickle.load(transposition_table_file)
@@ -299,7 +359,7 @@ if __name__ == "__main__":
         game_state_table = [ai.middle_game_table, ai.end_game_table]
         
     begin = time.time()
-    move = ai.find_move(ai.board)
+    move = ai.iterative_deepening_search(chessboard)
     end = time.time()
     print("Total run time:", abs(begin-end), "seconds")
     print("Total traversed nodes:", ai.nodes_traversed)
@@ -321,22 +381,6 @@ if __name__ == "__main__":
     
     game_state_table_file = open("tables/game_state_table.bin", "wb")
     pickle.dump(game_state_table, game_state_table_file)
-    # # Syzygy table for the endgame 
-    # # return NULL if empty
-    # # Loop through each legal move and compare dtz value
-    # # tablebase =chess.syzygy.open_tablebase("./3-4-5_pieces_Syzygy")
-    # # print(tablebase.get_dtz(board))
-
-    # # White team is a max player => trying to get the evaluation to be as positive as possible
-    # # Black team is a min player => trying to get the evaluation to be as negative as possible
-
-
-    # # Get the location of the pieces
-    # # for square in chess.SQUARES:
-    # #     piece = board.piece_at(square)
-    # #     if piece != None:
-    # #         print(chess.square_name(square), ": ", piece)
-
 
     # # engine = chess.engine.SimpleEngine.popen_uci("../stockfish-windows-x86-64-avx2/stockfish/stockfish-windows-x86-64-avx2.exe")
     # # # evaluation = engine.analyse(board, chess.engine.Limit(time=0.15, depth=3))

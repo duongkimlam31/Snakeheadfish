@@ -2,3 +2,4 @@
 chess
 tables
 src/__pycache__
+generate_tests.py
