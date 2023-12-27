@@ -381,30 +381,30 @@ class Chessboard {
   }
 
   void printBoardReverse() {
-    std::string s = "    A   B   C   D   E   F   G   H\n";
-    int row_num = 0;
+    std::string s = "    H   G   F   E   D   C   B   A\n";
+    int row_num = 7;
     for (int i = 0; i < 16; ++i) {
       if (i % 2 == 0) {
         s += "  +---+---+---+---+---+---+---+---+\n";
       } else {
-        std::string row_num_s = std::to_string(row_num + 1);
+        std::string row_num_s = std::to_string(8-row_num);
         std::string tmp = "";
         tmp += row_num_s + " ";
         for (int j = 0; j < 8; ++j) {
           tmp += "| ";
-          if (this->board->at(7 - row_num).at(j)->getPiece() == nullptr) {
-            tmp += this->board->at(7 - row_num).at(j)->getPrintStatus() + " ";
+          if (this->board->at(row_num).at(7-j)->getPiece() == nullptr) {
+            tmp += this->board->at(row_num).at(7-j)->getPrintStatus() + " ";
           } else {
-            tmp += board->at(7 - row_num).at(j)->getPiece()->getIcon() + " ";
+            tmp += board->at(row_num).at(7-j)->getPiece()->getIcon() + " ";
           }
         }
-        ++row_num;
+        --row_num;
         tmp += "| " + row_num_s + "\n";
         s += tmp;
       }
     }
     s += "  +---+---+---+---+---+---+---+---+\n";
-    s += "    A   B   C   D   E   F   G   H\n";
+    s += "    H   G   F   E   D   C   B   A\n";
     std::cout << s << std::endl;
   }
 
@@ -525,12 +525,12 @@ class Chessboard {
       char start_row_name = starting_location_name.at(1);
       int start_col = int(start_col_name) - 65;
       int start_row = 7 - (int(start_row_name) - 49);
-
+  
       char des_col_name = toupper(destination_name.at(0));
       char des_row_name = destination_name.at(1);
       int des_col = int(des_col_name) - 65;
       int des_row = 7 - (int(des_row_name) - 49);
-
+    
       Chesspiece *tmp = starting_location->getPiece();
       tmp->setPosition(destination_name);
       if (tmp->getTeam() == "black"){
@@ -724,9 +724,16 @@ class Chessboard {
     return points;
   }
 
-  void promote(Team *team, Cell *destination) {
+  int promote(Team *team, Cell *destination, int promotion_val) {
     std::vector<Chesspiece *> pieces = team->getPieces();
     Chesspiece *p = destination->getPiece();
+    
+    std::string destination_name = destination->getName();
+    char des_col_name = toupper(destination_name.at(0));
+    char des_row_name = destination_name.at(1);
+    int des_col = int(des_col_name) - 65;
+    int des_row = 7 - (int(des_row_name) - 49);
+    
     int i;
     for (i = 0; i < team->getPieces().size(); ++i) {
       if (team->getPieces().at(i)->getName() == p->getName()) {
@@ -736,45 +743,49 @@ class Chessboard {
     bool announced = false;
     while (true) {
       std::string input;
-      if (!announced) {
+      if (promotion_val != 0){
+        input = std::to_string(promotion_val);
+      }
+      else if (!announced) {
         std::cout << "What do you want to promote your pawn to?\n";
         std::cout << "1. Queen\n";
         std::cout << "2. Rook\n";
         std::cout << "3. Bishop\n";
         std::cout << "4. Knight\n";
         std::cin >> input;
+        announced = true;
+        if (stoi(input) > 4 || stoi(input) < 1){
+          std::cout << "Invalid input\n";
+          continue;
+        }
       }
       if (input == "1") {
-        delete p;
-        p = new Queen("Promoted " + team->getName() + " Queen", team->getName(),
+        Chesspiece *tmp_queen = new Queen("Promoted " + team->getName() + " Queen", team->getName(),
                       destination->getName());
-        pieces.at(i) = p;
-        destination->setPiece(p);
-        break;
+        team->setPiece(i, tmp_queen);
+        destination->setPiece(tmp_queen);
+        return 1;
       }
       if (input == "2") {
-        delete p;
-        p = new Rook("Promoted " + team->getName() + " Rook", team->getName(),
+        Chesspiece *tmp_rook = new Rook("Promoted " + team->getName() + " Rook", team->getName(),
                      destination->getName());
-        pieces.at(i) = p;
-        destination->setPiece(p);
-        break;
+        team->setPiece(i, tmp_rook);
+        destination->setPiece(tmp_rook);
+        return 2;
       }
       if (input == "3") {
-        delete p;
-        p = new Bishop("Promoted " + team->getName() + " Bishop",
+        Chesspiece *tmp_bishop = new Bishop("Promoted " + team->getName() + " Bishop",
                        team->getName(), destination->getName());
-        pieces.at(i) = p;
-        destination->setPiece(p);
-        break;
+        team->setPiece(i, tmp_bishop);
+        destination->setPiece(tmp_bishop);
+        return 3;
       }
       if (input == "4") {
-        delete p;
-        p = new Knight("Promoted " + team->getName() + " Knight",
+        Chesspiece *tmp_knight = new Knight("Promoted " + team->getName() + " Knight",
                        team->getName(), destination->getName());
-        pieces.at(i) = p;
-        destination->setPiece(p);
-        break;
+        team->setPiece(i, tmp_knight);
+        destination->setPiece(tmp_knight);
+        return 4;
       }
     }
   }
@@ -927,7 +938,7 @@ class Chessboard {
         }
       }
     }
-    if (castle_status != ""){
+    if (strcmp(castle_status, "") != 0){
       strcat(fen, " ");
       strcat(fen, castle_status);
     }

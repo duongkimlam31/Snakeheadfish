@@ -1,27 +1,41 @@
 #ifndef GAME_H
 #define GAME_H
-#include <sys/wait.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include <cctype>
 #include <string>
 #include <vector>
 
+#include "Snakeheadfish.h"
 #include "Chessboard.h"
 
 class Chess {
  private:
   Chessboard *chessboard;
+  Snakeheadfish *snakeheadfish;
+  chess::Board *ai_chessboard;
 
  public:
   Chess(Chessboard *chessboard) {
+    char book_path[] = "../book_openings/gm2600.bin";
     this->chessboard = chessboard;
+    std::cout << "Setting up...\n";
+    this->ai_chessboard = new chess::Board();
+    this->snakeheadfish = new Snakeheadfish(book_path, 10);
     this->chessboard->setup();
+    if (system("clear") == -1) {
+      exit(-1);
+    }
   }
 
-  ~Chess() { delete this->chessboard; };
+  ~Chess() {
+    delete this->chessboard;
+    delete this->snakeheadfish;
+    delete this->ai_chessboard;
+  };
 
   bool inCheck(int turn, Chessboard *board, Chesspiece *king) {
     bool check = false;
@@ -67,7 +81,6 @@ class Chess {
     }
     auto it = enemy_team_moves.find(piece->getPosition());
     check = (it != enemy_team_moves.end());
-    // std::cout << check << std::endl;
     return check;
   }
 
@@ -161,60 +174,31 @@ class Chess {
     return all_legal_moves;
   }
 
-  char *sendChessStateToPython(char *fen) {
-    int fd[2];
-    pipe(fd);
-    pid_t pid;
-    char *move = (char*)malloc(sizeof(char)*5);
-    pid = fork();
-    if (pid != 0) {
-      close(fd[1]);
-      wait(NULL);
-      char buffer[5];
-      read(fd[0], buffer, 4);
-      strcpy(move, buffer);
-      close(fd[0]);
-    } else if (pid == 0) {
-      close(fd[0]);
-      char write_end[2];
-      sprintf(write_end, "%d", fd[1]);
-      execlp("python3", "python3", "src/chessAI.py", fen, write_end, NULL);
-    }
-    free(fen);
-    return move;
-  }
-
   void start(std::string player_team) {
+    std::string move_sequence = "";
     std::string input;
+    std::string input_move;
     int turn = 0;
     bool announced = false;
-    bool checkmate = false;
-    bool stalemate = false;
     bool in_check = false;
     bool fifty_fifty_draw = false;
     bool player_turn;
     bool nextTurn;
+    std::string ai_move = "";
     Cell *c1 = NULL;
     Cell *c2 = NULL;
-    if (mkdir("./tables", S_IRWXU | S_IRWXG | S_IRWXO) == -1 && errno != EEXIST){
-        perror("Can't create output directory\n");
-        exit(-1);
-    }
-    int tt = open("tables/transposition_table.bin", O_TRUNC | O_CREAT, S_IRWXU);
-    close(tt);
-    int ht = open("tables/history_table.bin", O_TRUNC | O_CREAT, S_IRWXU);
-    close(ht);
-    int gst = open("tables/game_state_table.bin", O_TRUNC | O_CREAT, S_IRWXU);
-    close(gst);
-    if (player_team == "white"){
+    int promotion_val = 0;
+    if (player_team == "white") {
       player_turn = true;
-    }
-    else{
+    } else {
       player_turn = false;
     }
     while (true) {
-      if (this->chessboard->getHalfMove() == 50) {
-        fifty_fifty_draw = true;
+      chess::Movelist ai_board_legal_moves;
+      chess::movegen::legalmoves(ai_board_legal_moves, *ai_chessboard);
+      bool checkmate = (ai_board_legal_moves.empty() && ai_chessboard->inCheck());
+      bool stalemate = (ai_board_legal_moves.empty() && !ai_chessboard->inCheck());
+      if (checkmate || stalemate || ai_chessboard->isInsufficientMaterial() || ai_chessboard->isRepetition(2) || ai_chessboard->isHalfMoveDraw()){
         break;
       }
       if (!announced) {
@@ -243,26 +227,24 @@ class Chess {
         std::set<std::string> all_legal_moves;
         all_legal_moves = allLegalMoves(turn);
         pruneAvailableMoves(all_legal_moves, turn);
-        if (in_check) {
-          if (all_legal_moves.size() == 0) {
-            checkmate = true;
-            break;
-          } else {
-            this->chessboard->showLegalMoves(all_legal_moves, turn);
-          }
+        if (in_check && player_turn) {
+          this->chessboard->showLegalMoves(all_legal_moves, turn);
         }
-        if (all_legal_moves.size() == 0) {
-          stalemate = true;
-          break;
+        if (system("clear") == -1) {
+          exit(-1);
         }
-        // system("clear");
         if (player_team == "white") {
           this->chessboard->printBoard();
         } else {
           this->chessboard->printBoardReverse();
         }
+  
+        std::cout.flush();
+        if (player_turn){
+          std::cout << "Snakehead fish's move: " << ai_move << std::endl;
+        }
       }
-      if (player_turn){
+      if (player_turn) {
         if (turn % 2 != 0 && !announced) {
           std::cout << "Enter 0 to exit.\n";
           std::cout << "Black team's turn: \n";
@@ -302,24 +284,29 @@ class Chess {
           continue;
         }
         if (turn % 2 == 0 && c1->getPiece()->getTeam() != "white") {
-          std::cout << "This piece does not belong to your team. Please choose a "
-                      "different one. \n";
+          std::cout
+              << "This piece does not belong to your team. Please choose a "
+                 "different one. \n";
           continue;
         }
         if (turn % 2 != 0 && c1->getPiece()->getTeam() != "black") {
-          std::cout << "This piece does not belong to your team. Please choose a "
-                      "different one. \n";
+          std::cout
+              << "This piece does not belong to your team. Please choose a "
+                 "different one. \n";
           continue;
         }
         this->chessboard->removeAvailableMoves();
         this->chessboard->showAvailableMoves(c1->getName());
-        // system("clear");
+        if (system("clear") == -1) {
+          exit(-1);
+        }
         if (player_team == "white") {
           this->chessboard->printBoard();
         } else {
           this->chessboard->printBoardReverse();
         }
-        std::string input_move;
+  
+        std::cout.flush();
         nextTurn = false;
         bool announced_2 = false;
         while (true) {
@@ -374,11 +361,23 @@ class Chess {
             std::cout << "That move is not legal. Please try again. \n";
           }
         }
-      }
-      else{
+      } else {
         std::cout << "Thinking...\n\n";
-        char *chess_state = this->chessboard->getFen(turn);
-        char *move = sendChessStateToPython(chess_state);
+        this->snakeheadfish->lazy_smp(*ai_chessboard);
+        ai_move = chess::uci::moveToSan(*ai_chessboard, this->snakeheadfish->get_next_move());
+        ai_chessboard->makeMove(this->snakeheadfish->get_next_move());
+        std::string move = chess::uci::moveToUci(snakeheadfish->get_next_move());
+        if (move.size() == 5) {
+          if (move.at(move.size() - 1) == 'q') {
+            promotion_val = 1;
+          } else if (move.at(move.size() - 1) == 'r') {
+            promotion_val = 2;
+          } else if (move.at(move.size() - 1) == 'b') {
+            promotion_val = 3;
+          } else if (move.at(move.size() - 1) == 'n') {
+            promotion_val = 4;
+          }
+        }
         std::string starting_location = "";
         std::string destination = "";
         starting_location += move[0];
@@ -387,31 +386,70 @@ class Chess {
         destination += move[3];
         c1 = this->chessboard->getCell(starting_location);
         c2 = this->chessboard->getCell(destination);
-        free(move);
         player_turn = true;
         nextTurn = true;
       }
       if (nextTurn) {
         int points = this->chessboard->movePiece(c1, c2);
+        move_sequence += tolower(c1->getName().at(0));
+        move_sequence += c1->getName().at(1);
+        move_sequence += tolower(c2->getName().at(0));
+        move_sequence += c2->getName().at(1);
+        move_sequence += " ";
         addPoints(points, turn);
-        if (this->chessboard->getPromotionAvailable() && !player_turn) {
+        int player_promotion_val = 0;
+        if (this->chessboard->getPromotionAvailable()) {
           if (turn % 2 == 0) {
-            this->chessboard->promote(this->chessboard->getWhiteTeam(), c2);
+            player_promotion_val = this->chessboard->promote(
+                this->chessboard->getWhiteTeam(), c2, promotion_val);
           } else {
-            this->chessboard->promote(this->chessboard->getBlackTeam(), c2);
+            player_promotion_val = this->chessboard->promote(
+                this->chessboard->getBlackTeam(), c2, promotion_val);
           }
           this->chessboard->setPromotionAvailable(false);
+        }
+        if (!player_turn) {
+          std::string move = "";
+          move += tolower(input.at(0));
+          move += input.at(1);
+          move += tolower(input_move.at(0));
+          move += input_move.at(1);
+          if (player_promotion_val == 1) {
+            move += 'q';
+            chess::Move ai_board_move = chess::uci::uciToMove(*ai_chessboard, move);
+            this->ai_chessboard->makeMove(ai_board_move);
+          }
+          else if (player_promotion_val == 2) {
+            move += 'r';
+            chess::Move ai_board_move = chess::uci::uciToMove(*ai_chessboard, move);
+            this->ai_chessboard->makeMove(ai_board_move);
+          }
+          else if (player_promotion_val == 3) {
+            move += 'b';
+            chess::Move ai_board_move = chess::uci::uciToMove(*ai_chessboard, move);
+            this->ai_chessboard->makeMove(ai_board_move);
+          }
+          else if (player_promotion_val == 4) {
+            move += 'n';
+            chess::Move ai_board_move = chess::uci::uciToMove(*ai_chessboard, move);
+            this->ai_chessboard->makeMove(ai_board_move);
+          }
+          else{
+            chess::Move ai_board_move = chess::uci::uciToMove(*ai_chessboard, move);
+            this->ai_chessboard->makeMove(ai_board_move);
+          }
         }
         announced = false;
         ++turn;
         in_check = false;
+        promotion_val = 0;
         this->chessboard->removeAvailableMoves();
         if (this->chessboard->getWhiteTeam()->getKing()->getStatus() ==
             "checked") {
           this->chessboard->getWhiteTeam()->getKing()->setStatus("active");
           this->chessboard->getWhiteTeam()->getKing()->changeColor();
         } else if (this->chessboard->getBlackTeam()->getKing()->getStatus() ==
-                  "checked") {
+                   "checked") {
           this->chessboard->getBlackTeam()->getKing()->setStatus("active");
           this->chessboard->getBlackTeam()->getKing()->changeColor();
         }
@@ -423,14 +461,28 @@ class Chess {
     this->chessboard->getBlackTeam()->getKing()->setStatus("captured");
     this->chessboard->getWhiteTeam()->getKing()->changeColor();
     this->chessboard->getBlackTeam()->getKing()->changeColor();
-    // system("clear");
+    if (system("clear") == -1) {
+      exit(-1);
+    }
+    std::cout << "Move sequence: " << move_sequence << std::endl;
     if (player_team == "white") {
       this->chessboard->printBoard();
     } else {
       this->chessboard->printBoardReverse();
     }
-    if (fifty_fifty_draw) {
-      std::cout << "Draw" << std::endl;
+    std::cout.flush();
+    chess::Movelist ai_board_legal_moves;
+    chess::movegen::legalmoves(ai_board_legal_moves, *ai_chessboard);
+    bool checkmate = (ai_board_legal_moves.empty() && ai_chessboard->inCheck());
+    bool stalemate = (ai_board_legal_moves.empty() && !ai_chessboard->inCheck());
+    if (ai_chessboard->isRepetition(2)) {
+      std::cout << "Draw by repetition" << std::endl;
+    } 
+    if (ai_chessboard->isHalfMoveDraw()) {
+      std::cout << "Draw by fifty-move rule" << std::endl;
+    } 
+    else if (ai_chessboard->isInsufficientMaterial()) {
+      std::cout << "Draw by insufficient material" << std::endl;
     } else if (stalemate) {
       std::cout << "Stalemate" << std::endl;
     } else if (turn % 2 != 0 && checkmate) {

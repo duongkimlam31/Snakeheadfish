@@ -72,6 +72,12 @@ class Team {
   // Setter for pieces
   void setPieces(std::vector<Chesspiece *> pieces) { this->pieces = pieces; }
 
+  // Setter for a specific piece
+  void setPiece(int i, Chesspiece *piece){
+    delete this->pieces.at(i);
+    this->pieces.at(i) = piece;
+  }
+
   // Getter for king
   King *getKing() const { return this->king; }
 

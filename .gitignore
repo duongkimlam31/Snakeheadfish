@@ -5,3 +5,4 @@ tables/history_table.bin
 tables/transposition_table.bin
 src/__pycache__
 generate_tests.py
+test.cc

@@ -1,7 +1,10 @@
 #include "../include/Chess.h"
+#include "../include/Fathom/tbprobe.c"
 
 int main() {
-  system("clear");
+  if (system("clear") == -1){
+    exit(-1);
+  }
   std::cout << "   _____             _        _                    _   ______ "
                "_     _     "
             << std::endl;
@@ -24,7 +27,9 @@ int main() {
   std::cout << "Press Enter to continue...";
   std::string option;
   getline(std::cin, option);
-  system("clear");
+  if (system("clear") == -1){
+    exit(-1);
+  }
   option = "";
   Chessboard *chessboard = new Chessboard();
   Chess chess(chessboard);
@@ -48,7 +53,9 @@ int main() {
       continue;
     }
   }
-  system("clear");
+  if (system("clear") == -1){
+    exit(-1);
+  }
   chess.start(option);
   return 0;
 }
