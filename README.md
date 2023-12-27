@@ -14,17 +14,21 @@ Before the game starts, the player is asked to choose a team by entering 1 for w
 Option:</b> </pre>
 
 The GUI will be shown once an option is chosen:
+
 ![GUI 1](img/gui_1.png)
 
 To start a move, choose a piece to move by entering the file and the rank of the piece (e.g e2 or E2). After that the available moves for that piece will be shown as asterisks:
+
 ![GUI 2](img/gui_2.png)
 
 The player can choose one of these squares and yield the turn to the engine or they can choose to move another piece by entering 1.
 
 When an opponent piece turns red, it means that the player can capture that piece.
+
 ![GUI Capture](img/capture.png)
 
 When the player's king is in check, the king will turn red and the attackers' colors will be changed to purple.
+
 ![GUI In Check](img/in_check.png)
 
 ## Features
