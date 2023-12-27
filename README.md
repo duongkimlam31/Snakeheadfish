@@ -55,3 +55,10 @@ When the player's king is in check, the king will turn red and the attackers' co
 
 ## Limitations
 The engine is developed in a Linux environment, so it may not be compatible with devices that use other OS.
+
+## Acknowledgements
+[Chess Library](https://github.com/Disservin/chess-library)
+
+[Syzygy Tablebase Probing](https://github.com/jdart1/Fathom)
+
+[Opening Book Probing](https://www.youtube.com/watch?v=eGGL_9_qduI&t=527s&ab_channel=BluefeverSoftware)
