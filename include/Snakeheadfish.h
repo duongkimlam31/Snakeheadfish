@@ -92,17 +92,21 @@ class Snakeheadfish{
       this->nnue_on = nnue_on;
     }
     
-     Snakeheadfish(){
-      // for (int i = 0; i < this->thread_num; ++i){
-      //   for (int j = 0; j < 2; ++j){
-      //     for (int k = 0; k < 64; ++k){
-      //       free(history_tables[i][j][k]);
-      //     }
-      //     free(history_tables[i][j]);
-      //   }
-      //   free(history_tables[i]);
-      // }
-      // free(history_tables);
+     ~Snakeheadfish(){
+      for (int i = 0; i < this->thread_num; ++i){
+        for (int j = 0; j < 2; ++j){
+          for (int k = 0; k < 64; ++k){
+            free(history_tables[i][j][k]);
+          }
+          free(history_tables[i][j]);
+        }
+        free(history_tables[i]);
+      }
+      free(history_tables);
+      delete this->polyglot;
+      delete this->transposition_table;
+      delete this->evaluator;
+      delete[] this->entry_locks;
     }
 
     void init_history_tables(){
