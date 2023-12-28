@@ -62,3 +62,5 @@ The engine is developed in a Linux environment, so it may not be compatible with
 [Syzygy Tablebase Probing](https://github.com/jdart1/Fathom)
 
 [Opening Book Probing](https://www.youtube.com/watch?v=eGGL_9_qduI&t=527s&ab_channel=BluefeverSoftware)
+
+[NNUE Probing](https://github.com/dshawul/nnue-probe)
