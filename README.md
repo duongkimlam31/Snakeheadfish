@@ -36,7 +36,7 @@ When the player's king is in check, the king will turn red and the attackers' co
 2. Bitboard
 3. Quiescence Search
 4. Alpha-beta pruning
-5. Null-move pruning
+5. Verified null-move pruning
 6. Late-move reductions
 7. Extended Futility pruning
 8. Transposition table
