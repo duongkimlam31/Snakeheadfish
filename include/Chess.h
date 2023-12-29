@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
-#include "Snakeheadfish.h"
 #include "Chessboard.h"
+#include "Snakeheadfish.h"
 
 class Chess {
  private:
@@ -196,9 +196,12 @@ class Chess {
     while (true) {
       chess::Movelist ai_board_legal_moves;
       chess::movegen::legalmoves(ai_board_legal_moves, *ai_chessboard);
-      bool checkmate = (ai_board_legal_moves.empty() && ai_chessboard->inCheck());
-      bool stalemate = (ai_board_legal_moves.empty() && !ai_chessboard->inCheck());
-      if (checkmate || stalemate || ai_chessboard->isInsufficientMaterial() || ai_chessboard->isRepetition(2) || ai_chessboard->isHalfMoveDraw()){
+      bool checkmate =
+          (ai_board_legal_moves.empty() && ai_chessboard->inCheck());
+      bool stalemate =
+          (ai_board_legal_moves.empty() && !ai_chessboard->inCheck());
+      if (checkmate || stalemate || ai_chessboard->isInsufficientMaterial() ||
+          ai_chessboard->isRepetition(2) || ai_chessboard->isHalfMoveDraw()) {
         break;
       }
       if (!announced) {
@@ -238,9 +241,9 @@ class Chess {
         } else {
           this->chessboard->printBoardReverse();
         }
-  
+
         std::cout.flush();
-        if (player_turn){
+        if (player_turn) {
           std::cout << "Snakehead fish's move: " << ai_move << std::endl;
         }
       }
@@ -305,7 +308,7 @@ class Chess {
         } else {
           this->chessboard->printBoardReverse();
         }
-  
+
         std::cout.flush();
         nextTurn = false;
         bool announced_2 = false;
@@ -364,9 +367,11 @@ class Chess {
       } else {
         std::cout << "Thinking...\n\n";
         this->snakeheadfish->lazy_smp(*ai_chessboard);
-        ai_move = chess::uci::moveToSan(*ai_chessboard, this->snakeheadfish->get_next_move());
+        ai_move = chess::uci::moveToSan(*ai_chessboard,
+                                        this->snakeheadfish->get_next_move());
         ai_chessboard->makeMove(this->snakeheadfish->get_next_move());
-        std::string move = chess::uci::moveToUci(snakeheadfish->get_next_move());
+        std::string move =
+            chess::uci::moveToUci(snakeheadfish->get_next_move());
         if (move.size() == 5) {
           if (move.at(move.size() - 1) == 'q') {
             promotion_val = 1;
@@ -416,26 +421,27 @@ class Chess {
           move += input_move.at(1);
           if (player_promotion_val == 1) {
             move += 'q';
-            chess::Move ai_board_move = chess::uci::uciToMove(*ai_chessboard, move);
+            chess::Move ai_board_move =
+                chess::uci::uciToMove(*ai_chessboard, move);
             this->ai_chessboard->makeMove(ai_board_move);
-          }
-          else if (player_promotion_val == 2) {
+          } else if (player_promotion_val == 2) {
             move += 'r';
-            chess::Move ai_board_move = chess::uci::uciToMove(*ai_chessboard, move);
+            chess::Move ai_board_move =
+                chess::uci::uciToMove(*ai_chessboard, move);
             this->ai_chessboard->makeMove(ai_board_move);
-          }
-          else if (player_promotion_val == 3) {
+          } else if (player_promotion_val == 3) {
             move += 'b';
-            chess::Move ai_board_move = chess::uci::uciToMove(*ai_chessboard, move);
+            chess::Move ai_board_move =
+                chess::uci::uciToMove(*ai_chessboard, move);
             this->ai_chessboard->makeMove(ai_board_move);
-          }
-          else if (player_promotion_val == 4) {
+          } else if (player_promotion_val == 4) {
             move += 'n';
-            chess::Move ai_board_move = chess::uci::uciToMove(*ai_chessboard, move);
+            chess::Move ai_board_move =
+                chess::uci::uciToMove(*ai_chessboard, move);
             this->ai_chessboard->makeMove(ai_board_move);
-          }
-          else{
-            chess::Move ai_board_move = chess::uci::uciToMove(*ai_chessboard, move);
+          } else {
+            chess::Move ai_board_move =
+                chess::uci::uciToMove(*ai_chessboard, move);
             this->ai_chessboard->makeMove(ai_board_move);
           }
         }
@@ -474,14 +480,14 @@ class Chess {
     chess::Movelist ai_board_legal_moves;
     chess::movegen::legalmoves(ai_board_legal_moves, *ai_chessboard);
     bool checkmate = (ai_board_legal_moves.empty() && ai_chessboard->inCheck());
-    bool stalemate = (ai_board_legal_moves.empty() && !ai_chessboard->inCheck());
+    bool stalemate =
+        (ai_board_legal_moves.empty() && !ai_chessboard->inCheck());
     if (ai_chessboard->isRepetition(2)) {
       std::cout << "Draw by repetition" << std::endl;
-    } 
+    }
     if (ai_chessboard->isHalfMoveDraw()) {
       std::cout << "Draw by fifty-move rule" << std::endl;
-    } 
-    else if (ai_chessboard->isInsufficientMaterial()) {
+    } else if (ai_chessboard->isInsufficientMaterial()) {
       std::cout << "Draw by insufficient material" << std::endl;
     } else if (stalemate) {
       std::cout << "Stalemate" << std::endl;

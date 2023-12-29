@@ -15,7 +15,6 @@
 #include <iostream>
 #include <unordered_set>
 
-
 // Declare global variables
 #define ASPIRATION_WINDOW 100
 
@@ -24,7 +23,7 @@
 #define LOWERBOUND -1
 
 const int num_processor = std::thread::hardware_concurrency();
-int futility_margin[4] = {0, 200, 600, 900};
+int futility_margin[4] = {0, 200, 600, 1000};
 
 int mvv_lva[7][7] = {
   {15, 14, 13, 12, 11, 10, 0},
@@ -244,6 +243,12 @@ class Snakeheadfish{
       chess::Movelist legal_moves;
       chess::Movelist legal_captures;
       chess::movegen::legalmoves(legal_moves, chessboard);
+      if (is_cutoff(chessboard, legal_moves)){
+        if (nnue_on){
+          return evaluator->nnue_evaluation_function(chessboard, legal_moves);
+        }
+        return evaluator->evaluation_function(chessboard, legal_moves);
+      }
       float stand_pat;
       if (!nnue_on){
         stand_pat = evaluator->evaluation_function(chessboard, legal_moves);
@@ -263,18 +268,24 @@ class Snakeheadfish{
         }
       }
       mvv_lva_heuristic(chessboard, legal_captures);
+      float best_val = stand_pat;
       for (const auto &capture : legal_captures){
         chessboard.makeMove(capture);
         float val = -quiescence_search(chessboard, -beta, -alpha);
         chessboard.unmakeMove(capture);
-        if (val > alpha){
-          alpha = val;
-        }
-        if (alpha >= beta){
-          break;
+        if (val > best_val){
+          best_val = val;
+          if (val > alpha){
+            if (val < beta){
+              alpha = val;
+            }
+            else{
+              break;
+            }
+          }
         }
       }
-      return alpha;
+      return best_val;
     }
 
     float alpha_beta_negamax(chess::Board &chessboard, float alpha, float beta, int depth, int thread_id, bool allow_null_move_prune = true){
@@ -289,6 +300,13 @@ class Snakeheadfish{
       bool valid_entry = false;
       chess::Movelist legal_moves;
       chess::movegen::legalmoves(legal_moves, chessboard);
+      float static_eval;
+      if (nnue_on){
+        static_eval = evaluator->nnue_evaluation_function(chessboard, legal_moves);
+      }
+      else{
+        static_eval = evaluator->evaluation_function(chessboard, legal_moves);
+      }
       if (is_cutoff(chessboard, legal_moves)){
         if (nnue_on){
           return evaluator->nnue_evaluation_function(chessboard, legal_moves);
@@ -300,6 +318,7 @@ class Snakeheadfish{
       if (valid_entry){
         entry = this->transposition_table->probe_table(zobrist_hash);
         hash_move = entry.best_move;
+        static_eval = entry.best_value;
         if (entry.depth >= depth){
           if (entry.flag == EXACT){
             entry_locks[lock_index].unlock();
@@ -346,7 +365,7 @@ class Snakeheadfish{
       if (chessboard.sideToMove() == chess::Color::BLACK){
         material_balance *= -1;
       }
-      fscore = material_balance + futility_margin[depth];
+      fscore = static_eval + futility_margin[depth];
       if (!chessboard.inCheck() && depth == 3 && fscore <= alpha && !pv_node){
         int white_num_pieces = 0;
         int black_num_pieces = 0;
@@ -366,7 +385,7 @@ class Snakeheadfish{
           depth = 2;
         }
       }
-      fscore = material_balance + futility_margin[depth];
+      fscore = static_eval + futility_margin[depth];
       if (!chessboard.inCheck() && (depth == 2 || depth == 1) && fscore <= alpha && !pv_node){
         fprune = 1;
         fmax = fscore;
@@ -388,15 +407,13 @@ class Snakeheadfish{
             killer_move = (this->killer_moves_tables[thread_id][ply].at(0) == move || this->killer_moves_tables[thread_id][ply].at(1) == move);
           }
           // Deep futility pruning
-          int material_gain = 0;
-          if (chessboard.isCapture(move)){
-            chess::Square victim = move.to();
-            chess::Piece victim_piece = chessboard.at(victim);
-            chess::PieceType victim_piece_type = chess::utils::typeOfPiece(victim_piece);
-            material_gain = piece_dictionary[victim_piece_type];
+          int new_material_balance = evaluator->material_balance(new_board);
+          if (chessboard.sideToMove() == chess::Color::BLACK){
+            new_material_balance *= -1;
           }
-          if (fprune && (fmax + material_gain) <= alpha && !(new_board.inCheck()) && move.typeOf() != chess::Move::PROMOTION && !killer_move){
-            return quiescence_search(chessboard, alpha, beta);
+          int material_gain = new_material_balance-material_balance;
+          if (fprune && (fmax + material_gain) <= alpha && !(new_board.inCheck()) && !killer_move){
+            continue;
           }
           // Late move reductions
           bool allow_late_move_reductions = (!chessboard.inCheck() && !(new_board.inCheck()) && !chessboard.isCapture(move) && move.typeOf() != chess::Move::PROMOTION && !pv_node && !killer_move);
@@ -437,7 +454,7 @@ class Snakeheadfish{
           }
           break;
         }
-      moves_searched++;
+        moves_searched++;
       }
       if (!chessboard.isCapture(best_move)){
         this->history_tables[thread_id][to_move(chessboard)][best_move.from()][best_move.to()] += depth*depth;
@@ -562,102 +579,6 @@ class Snakeheadfish{
         cutoff_depth++;
       }
     }
-
-    // void iid_lazy_smp(chess::Board chessboard){
-    //
-    //   init_history_tables();
-    //   for (int i = 0; i < this->thread_num;++i){
-    //     this->killer_moves_tables[i].clear();
-    //   }
-    //   this->next_move = chess::Move::NO_MOVE;
-    //   chess::Movelist opening_moves;
-    //   uint64_t polykey = polyglot->PolyKeyFromBoard(chessboard);
-    //   opening_moves = polyglot->listBookMoves(polykey, chessboard);
-    //   if (opening_moves.size() > 0){
-    //     this->next_move = *select_randomly(opening_moves.begin(), opening_moves.end());
-    //     return;
-    //   }
-    //   int tmp = 0;
-    //   for(int sq = 0; sq < chess::constants::MAX_SQ; ++sq){
-    //     chess::Piece piece = chessboard.at(chess::Square(sq));
-    //     chess::PieceType piece_type = chess::utils::typeOfPiece(piece);
-    //     if (piece_type != chess::PieceType::NONE){
-    //       tmp++;
-    //     }
-    //   }
-    //   if (tmp <= 5){
-    //     struct pos pos0;
-    //     struct pos *pos = &pos0;
-    //     std::string fen = chessboard.getFen();
-    //     const char* c_fen = fen.c_str();
-    //     if (!parse_FEN(pos, c_fen)){
-    //       fprintf(stderr, "error: unable to parse FEN string \"%s\"\n", c_fen);
-    //       exit(EXIT_FAILURE);
-    //     }
-    //     if (tb_pop_count(pos->white | pos->black) > TB_LARGEST)
-    //     {
-    //         fprintf(stderr, "error: unable to probe tablebase; FEN string \"%s\" "
-    //             "has too many pieces (max=%u)\n", c_fen, TB_LARGEST);
-    //         exit(EXIT_FAILURE);
-    //     }
-    //     unsigned move = tb_probe_root(pos->white, pos->black, pos->kings,
-    //         pos->queens, pos->rooks, pos->bishops, pos->knights, pos->pawns,
-    //         pos->rule50, pos->castling, pos->ep, pos->turn, NULL);
-    //     if (move == TB_RESULT_FAILED)
-    //     {
-    //       printf("{TB probe failed}\n");
-    //     }
-    //     char str[32];
-    //     move_to_str(pos, move, str);
-    //     this->next_move = chess::uci::parseSan(chessboard, str);
-    //     return;
-    //   }
-    //   int alpha = -CHECKMATE_VAL;
-    //   int beta = CHECKMATE_VAL;
-    //   int best_value = -CHECKMATE_VAL;
-    //   tt_entry_t entry;
-    //   std::string fen = chessboard.getFen();
-    //   const char* c_fen = fen.c_str();
-    //   uint64_t zobrist_hash = chessboard.hash();
-    //   int cutoff_depth = 2;
-    //   std::vector<chess::Board> chessboards;
-    //   for (int i = 0; i < this->thread_num; ++i){
-    //     chessboards.push_back(chess::Board(chessboard.getFen()));
-    //   }
-    //   threads[0] = std::thread(&Snakeheadfish::alpha_beta_negamax, this, std::ref(chessboards.at(0)), alpha, beta, 1, 0, 1, chess::Move::NO_MOVE, true);
-    //   threads[0].join();
-    //   if (this->search_depth == 1){
-    //     entry = this->transposition_table->probe_table(zobrist_hash);
-    //     this->next_move = entry.best_move;
-    //     return;
-    //   }
-    //   while (cutoff_depth <= this->search_depth){
-    //     entry = this->transposition_table->probe_table(zobrist_hash);
-    //     best_value = entry.best_value;
-    //     this->next_move = entry.best_move;
-    //     for (int id = 0; id < this->thread_num; ++id){
-    //       threads[id] = std::thread(&Snakeheadfish::alpha_beta_negamax, this, std::ref(chessboards.at(id)), alpha, beta, cutoff_depth, id, cutoff_depth, chess::Move::NO_MOVE, true);
-    //     }
-    //     for (int id = 0; id < this->thread_num; ++id){
-    //       threads[id].join();
-    //     }
-    //     if (std::abs(best_value) == CHECKMATE_VAL){
-    //       break;
-    //     }
-    //     if (best_value <= alpha){
-    //       alpha = -CHECKMATE_VAL;
-    //       continue;
-    //     }
-    //     if (best_value >= beta){
-    //       beta = CHECKMATE_VAL;
-    //       continue;
-    //     }
-    //     alpha = best_value - ASPIRATION_WINDOW;
-    //     beta = best_value + ASPIRATION_WINDOW;
-    //     cutoff_depth++;
-    //   }
-    // }
-
 };
 
 #endif
