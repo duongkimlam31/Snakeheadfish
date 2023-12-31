@@ -400,6 +400,10 @@ class Snakeheadfish{
       if (chessboard.inCheck()){
         depth++;
       }
+      // One reply extension
+      if (legal_moves.size() == 0 && !chessboard.inCheck()){
+        depth++;
+      }
       goto search;
       search:
         for (const auto &move : ordered_moves){

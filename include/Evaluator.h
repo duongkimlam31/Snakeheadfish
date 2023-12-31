@@ -11,7 +11,7 @@
 class Evaluator{
   public:
     Evaluator(){
-      nnue_init("nn-eba324f53044.nnue");
+      nnue_init("nn-62ef826d1a6d.nnue");
     }
     int crowded_pawns_evaluation(const chess::Board &chessboard){
       std::unordered_set<int> white_team_crowded_files;

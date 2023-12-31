@@ -45,13 +45,14 @@ When the player's king is in check, the king will turn red and the attackers' co
 11. Killer Move Heuristic
 12. Iterative Deepening Search
 13. In-check Extension
-14. Aspiration Window
-15. Principal Variation Search
-16. Lazy SMP
-17. Syzygy tablebase
-18. Book opening tablebase
-19. Base evaluation function
-20. NNUE evaluation function
+14. One Reply Extension
+15. Aspiration Window
+16. Principal Variation Search
+17. Lazy SMP
+18. Syzygy tablebase
+19. Book opening tablebase
+20. Base evaluation function
+21. NNUE evaluation function
 
 ## Limitations
 The engine is developed in a Linux environment, so it may not be compatible with devices that use other OS.
