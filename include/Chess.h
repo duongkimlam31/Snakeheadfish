@@ -367,8 +367,7 @@ class Chess {
       } else {
         std::cout << "Thinking...\n\n";
         this->snakeheadfish->lazy_smp(*ai_chessboard);
-        ai_move = chess::uci::moveToSan(*ai_chessboard,
-                                        this->snakeheadfish->get_next_move());
+        ai_move = chess::uci::moveToUci(this->snakeheadfish->get_next_move());
         ai_chessboard->makeMove(this->snakeheadfish->get_next_move());
         std::string move =
             chess::uci::moveToUci(snakeheadfish->get_next_move());

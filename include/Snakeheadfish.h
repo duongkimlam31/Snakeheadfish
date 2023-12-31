@@ -16,14 +16,14 @@
 #include <unordered_set>
 
 // Declare global variables
-#define ASPIRATION_WINDOW 100
+#define ASPIRATION_WINDOW 75
 
 #define UPPERBOUND 1
 #define EXACT 0
 #define LOWERBOUND -1
 
 const int num_processor = std::thread::hardware_concurrency();
-int futility_margin[4] = {0, 200, 600, 1000};
+int futility_margin[4] = {0, 600, 1800, 3000};
 
 int mvv_lva[7][7] = {
   {15, 14, 13, 12, 11, 10, 0},
@@ -259,13 +259,23 @@ class Snakeheadfish{
       if (stand_pat >= beta){
         return stand_pat;
       }
-      if (alpha < stand_pat){
-        alpha = stand_pat;
-      }
+      int delta = 2700;
+      int delta_bonus = 0;
       for (const auto &move : legal_moves){
         if (chessboard.isCapture(move)){
           legal_captures.add(move);
         }
+        if (move.typeOf() == chess::Move::PROMOTION && delta_bonus == 0){
+          delta_bonus += 2700;
+        }
+      }
+      // Delta pruning
+      float delta_val = delta + stand_pat + delta_bonus;
+      if (delta_val <= alpha && !chessboard.inCheck()){
+        return stand_pat;
+      }
+      if (alpha < stand_pat){
+        alpha = stand_pat;
       }
       mvv_lva_heuristic(chessboard, legal_captures);
       float best_val = stand_pat;
@@ -428,7 +438,7 @@ class Snakeheadfish{
             }
             // Late move reductions
             bool allow_late_move_reductions = (!chessboard.inCheck() && !new_board.inCheck() && !chessboard.isCapture(move) && move.typeOf() != chess::Move::PROMOTION && !pv_node && !killer_move);
-            if (moves_searched >= 4 && depth >= 3 && allow_late_move_reductions){
+            if (moves_searched > 1 && depth >= 3 && allow_late_move_reductions){
               val = -alpha_beta_negamax(new_board, -(alpha+1), -alpha, depth-1-r, thread_id, verify);
             }
             else{
@@ -510,15 +520,21 @@ class Snakeheadfish{
         this->next_move = *select_randomly(opening_moves.begin(), opening_moves.end());
         return;
       }
-      int tmp = 0;
+      chess::Movelist legal_moves;
+      chess::movegen::legalmoves(legal_moves, chessboard);
+      if (legal_moves.size() == 1){
+        this->next_move = legal_moves[0];
+        return;
+      }
+      int total_pieces = 0;
       for(int sq = 0; sq < chess::constants::MAX_SQ; ++sq){
         chess::Piece piece = chessboard.at(chess::Square(sq));
         chess::PieceType piece_type = chess::utils::typeOfPiece(piece);
         if (piece_type != chess::PieceType::NONE){
-          tmp++;
+          total_pieces++;
         }
       }
-      if (tmp <= 5){
+      if (total_pieces <= 5){
         struct pos pos0;
         struct pos *pos = &pos0;
         std::string fen = chessboard.getFen();
@@ -584,11 +600,11 @@ class Snakeheadfish{
           break;
         }
         if (best_value <= alpha){
-          alpha = -CHECKMATE_VAL;
+          alpha = best_value - ASPIRATION_WINDOW*4;
           continue;
         }
         if (best_value >= beta){
-          beta = CHECKMATE_VAL;
+          beta = best_value + ASPIRATION_WINDOW*4;
           continue;
         }
         alpha = best_value - ASPIRATION_WINDOW;

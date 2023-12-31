@@ -53,6 +53,7 @@ When the player's king is in check, the king will turn red and the attackers' co
 19. Book opening tablebase
 20. Base evaluation function
 21. NNUE evaluation function
+22. Delta pruning
 
 ## Limitations
 The engine is developed in a Linux environment, so it may not be compatible with devices that use other OS.
