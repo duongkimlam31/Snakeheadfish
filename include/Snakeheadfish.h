@@ -566,10 +566,7 @@ class Snakeheadfish{
         chess::Board tmp_chessboard = chessboard;
         chessboards.push_back(tmp_chessboard);
       }
-      for (int id = 0; id < this->thread_num/2; ++id){
-        threads[id] = std::thread(&Snakeheadfish::iterative_deepening_search, this, std::ref(chessboards.at(id)), id, this->search_depth-1);
-      }
-      for (int id = this->thread_num/2; id < this->thread_num; ++id){
+      for (int id = 0; id < this->thread_num; ++id){
         threads[id] = std::thread(&Snakeheadfish::iterative_deepening_search, this, std::ref(chessboards.at(id)), id, this->search_depth);
       }
       for (int id = 0; id < this->thread_num; ++id){
@@ -600,11 +597,11 @@ class Snakeheadfish{
           break;
         }
         if (best_value <= alpha){
-          alpha = best_value - ASPIRATION_WINDOW*4;
+          alpha = -CHECKMATE_VAL;
           continue;
         }
         if (best_value >= beta){
-          beta = best_value + ASPIRATION_WINDOW*4;
+          beta = CHECKMATE_VAL;
           continue;
         }
         alpha = best_value - ASPIRATION_WINDOW;

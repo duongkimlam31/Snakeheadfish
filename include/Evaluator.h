@@ -2,10 +2,10 @@
 #define EVALUATOR_H
 
 #include "piece_square_tables.h"
-#include "chess.hpp"
+#include "../include/chess.hpp"
 #include <unordered_set>
 #include <string>
-#include "nnue.h"
+#include "../include/nnue.h"
 #define CHECKMATE_VAL 999999
 
 class Evaluator{
@@ -158,7 +158,7 @@ class Evaluator{
 
     int material_balance(const chess::Board &chessboard){
       int val = 0;
-      std::unordered_map<chess::PieceType, int>  piece_dictionary = {{chess::PieceType::PAWN, 100}, {chess::PieceType::KNIGHT, 320}, {chess::PieceType::BISHOP, 325}, {chess::PieceType::ROOK, 500}, {chess::PieceType::QUEEN, 900}, {chess::PieceType::KING, 0}, {chess::PieceType::NONE, 0}};
+      std::unordered_map<chess::PieceType, int>  piece_dictionary = {{chess::PieceType::PAWN, 300}, {chess::PieceType::KNIGHT, 1300}, {chess::PieceType::BISHOP, 1400}, {chess::PieceType::ROOK, 1500}, {chess::PieceType::QUEEN, 2700}, {chess::PieceType::KING, 0}, {chess::PieceType::NONE, 0}};
       for(int sq = 0; sq < chess::constants::MAX_SQ; ++sq){
         chess::Piece piece = chessboard.at(chess::Square(sq));
         chess::PieceType piece_type = chess::utils::typeOfPiece(piece);
