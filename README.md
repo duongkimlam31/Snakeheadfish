@@ -27,10 +27,6 @@ When an opponent piece turns red, it means that the player can capture that piec
 
 ![GUI Capture](img/capture.png)
 
-When the player's king is in check, the king will turn red and the attackers' colors will be changed to purple.
-
-![GUI In Check](img/in_check.png)
-
 ## Features
 1. Negamax Search Algorithm
 2. Bitboard
