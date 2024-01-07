@@ -2,11 +2,13 @@
 #define EVALUATOR_H
 
 #include "piece_square_tables.h"
-#include "../include/chess.hpp"
+#include "chess.hpp"
 #include <unordered_set>
 #include <string>
-#include "../include/nnue.h"
+#include "nnue.h"
+
 #define CHECKMATE_VAL 999999
+#define NO_VAL -1000000
 
 class Evaluator{
   public:
@@ -158,18 +160,25 @@ class Evaluator{
 
     int material_balance(const chess::Board &chessboard){
       int val = 0;
-      std::unordered_map<chess::PieceType, int>  piece_dictionary = {{chess::PieceType::PAWN, 300}, {chess::PieceType::KNIGHT, 1300}, {chess::PieceType::BISHOP, 1400}, {chess::PieceType::ROOK, 1500}, {chess::PieceType::QUEEN, 2700}, {chess::PieceType::KING, 0}, {chess::PieceType::NONE, 0}};
-      for(int sq = 0; sq < chess::constants::MAX_SQ; ++sq){
-        chess::Piece piece = chessboard.at(chess::Square(sq));
-        chess::PieceType piece_type = chess::utils::typeOfPiece(piece);
-        if (chessboard.color(piece) == chess::Color::WHITE){
-          val += piece_dictionary[piece_type];
-        }
-        else if (chessboard.color(piece) == chess::Color::BLACK){
-          val -= piece_dictionary[piece_type];
-        }
+      std::unordered_map<chess::PieceType, int>  piece_dictionary = {{chess::PieceType::PAWN, 300}, {chess::PieceType::KNIGHT, 1100}, {chess::PieceType::BISHOP, 1200}, {chess::PieceType::ROOK, 1300}, {chess::PieceType::QUEEN, 2500}, {chess::PieceType::KING, 0}, {chess::PieceType::NONE, 0}};
+      for (const auto & [ piece, value ] : piece_dictionary){
+        val += piece_dictionary[piece] * chess::builtin::popcount(chessboard.pieces(piece, chess::Color::WHITE));
+        val -= piece_dictionary[piece] * chess::builtin::popcount(chessboard.pieces(piece, chess::Color::BLACK));
       }
       return val;
+    }
+
+    bool is_end_game(const chess::Board &chessboard){
+      int num_white_knight = chess::builtin::popcount(chessboard.pieces(chess::PieceType::KNIGHT, chess::Color::WHITE));
+      int num_white_bishop = chess::builtin::popcount(chessboard.pieces(chess::PieceType::BISHOP, chess::Color::WHITE));
+      int num_white_rook = chess::builtin::popcount(chessboard.pieces(chess::PieceType::ROOK, chess::Color::WHITE));
+      int num_white_queen = chess::builtin::popcount(chessboard.pieces(chess::PieceType::QUEEN, chess::Color::WHITE));
+
+      int num_black_knight = chess::builtin::popcount(chessboard.pieces(chess::PieceType::KNIGHT, chess::Color::BLACK));
+      int num_black_bishop = chess::builtin::popcount(chessboard.pieces(chess::PieceType::BISHOP, chess::Color::BLACK));
+      int num_black_rook = chess::builtin::popcount(chessboard.pieces(chess::PieceType::ROOK, chess::Color::BLACK));
+      int num_black_queen = chess::builtin::popcount(chessboard.pieces(chess::PieceType::QUEEN, chess::Color::BLACK));
+      return (((num_white_knight + num_white_bishop + num_white_rook + num_white_queen) <= 4) && ((num_black_knight + num_black_bishop + num_black_rook + num_black_queen) < 4) || ((num_white_knight + num_white_bishop + num_white_rook + num_white_queen) < 4) && ((num_black_knight + num_black_bishop + num_black_rook + num_black_queen) <= 4));
     }
 
     int mg_positional_evaluation(const chess::Board &chessboard){

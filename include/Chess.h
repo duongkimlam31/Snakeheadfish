@@ -230,9 +230,6 @@ class Chess {
         std::set<std::string> all_legal_moves;
         all_legal_moves = allLegalMoves(turn);
         pruneAvailableMoves(all_legal_moves, turn);
-        if (in_check && player_turn) {
-          this->chessboard->showLegalMoves(all_legal_moves, turn);
-        }
         if (system("clear") == -1) {
           exit(-1);
         }

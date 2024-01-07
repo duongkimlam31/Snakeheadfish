@@ -16,14 +16,20 @@
 #include <unordered_set>
 
 // Declare global variables
-#define ASPIRATION_WINDOW 75
+#define ASPIRATION_WINDOW 150
 
 #define UPPERBOUND 1
 #define EXACT 0
 #define LOWERBOUND -1
 
+#define CutNode 1
+#define PVNode 0
+#define AllNode -1
+
+#define OPP_NODE(node_type)     (-(node_type))
+
 const int num_processor = std::thread::hardware_concurrency();
-int futility_margin[4] = {0, 600, 1800, 3000};
+int futility_margin[4] = {0, 600, 1600, 2800};
 
 int mvv_lva[7][7] = {
   {15, 14, 13, 12, 11, 10, 0},
@@ -68,7 +74,7 @@ class Snakeheadfish{
   public:
     Snakeheadfish(char *book_path, int search_depth=6, int nnue_on = 1){
       this->search_depth = search_depth;
-      this->thread_num = num_processor/2;
+      this->thread_num = num_processor;
       history_tables = (unsigned int ****) malloc(this->thread_num * sizeof(unsigned int ***));
       for (int i = 0; i < this->thread_num; ++i){
         history_tables[i] = (unsigned int ***) malloc(2 * sizeof(unsigned int**));
@@ -119,6 +125,11 @@ class Snakeheadfish{
         }
       }
     }
+
+    void setSearchDepth(int depth){
+      this->search_depth = depth;
+    }
+    
 
     chess::Move get_next_move(){
       return this->next_move;
@@ -256,40 +267,49 @@ class Snakeheadfish{
       else{
         stand_pat = evaluator->nnue_evaluation_function(chessboard, legal_moves);
       }
-      if (stand_pat >= beta){
-        return stand_pat;
-      }
-      int delta = 2700;
-      int delta_bonus = 0;
       for (const auto &move : legal_moves){
         if (chessboard.isCapture(move)){
           legal_captures.add(move);
         }
-        if (move.typeOf() == chess::Move::PROMOTION && delta_bonus == 0){
-          delta_bonus += 2700;
-        }
       }
-      // Delta pruning
-      float delta_val = delta + stand_pat + delta_bonus;
+      int material_balance = evaluator->material_balance(chessboard);
+      if (chessboard.sideToMove() == chess::Color::BLACK){
+        material_balance *= -1;
+      }
+      int delta = 600;
+      bool delta_prune = false;
+      float delta_val = delta + stand_pat;
       if (delta_val <= alpha && !chessboard.inCheck()){
-        return stand_pat;
+        delta_prune = true;
       }
       if (alpha < stand_pat){
         alpha = stand_pat;
+        if (stand_pat >= beta){
+          return stand_pat;
+        }
       }
       mvv_lva_heuristic(chessboard, legal_captures);
       float best_val = stand_pat;
       for (const auto &capture : legal_captures){
+        // Delta pruning
+        int new_material_balance = 1;
+        if (chessboard.sideToMove() == chess::Color::BLACK){
+          new_material_balance = -1;
+        }
         chessboard.makeMove(capture);
+        new_material_balance *= evaluator->material_balance(chessboard);
+        int material_gain = new_material_balance-material_balance;
+        if (delta_prune && !chessboard.inCheck() && delta_val+material_gain <= alpha){
+          chessboard.unmakeMove(capture);
+          continue;
+        }
         float val = -quiescence_search(chessboard, -beta, -alpha);
         chessboard.unmakeMove(capture);
         if (val > best_val){
           best_val = val;
           if (val > alpha){
-            if (val < beta){
-              alpha = val;
-            }
-            else{
+            alpha = val;
+            if (val >= beta){
               break;
             }
           }
@@ -298,9 +318,8 @@ class Snakeheadfish{
       return best_val;
     }
 
-    float alpha_beta_negamax(chess::Board &chessboard, float alpha, float beta, int depth, int thread_id, bool verify, bool allow_null_move = true){
+    float alpha_beta_negamax(chess::Board &chessboard, float alpha, float beta, int depth, int thread_id, bool verify, int node_type, bool allow_null_move = true){
       int ply = chessboard.getPly();
-      bool pv_node = (beta - alpha > 1);
       float original_alpha = alpha;
       uint64_t zobrist_hash = chessboard.hash();
       int lock_index = this->transposition_table->hash_function(zobrist_hash);
@@ -333,7 +352,7 @@ class Snakeheadfish{
         entry = this->transposition_table->probe_table(zobrist_hash);
         hash_move = entry.best_move;
         static_eval = entry.best_value;
-        if (entry.depth >= depth){
+        if (entry.depth >= depth && node_type != PVNode){
           if (entry.flag == EXACT){
             entry_locks[lock_index].unlock();
             return entry.best_value;
@@ -351,10 +370,10 @@ class Snakeheadfish{
         }
       }
       entry_locks[lock_index].unlock();
-      if (!chessboard.inCheck() && (depth > 1 || !verify) && !pv_node && allow_null_move){
-        // verified null-move pruning
+      // verified null-move pruning
+      if (!chessboard.inCheck() && (depth > 1 || !verify) && node_type != PVNode && allow_null_move){
         chessboard.makeNullMove();
-        val = -alpha_beta_negamax(chessboard, -beta, -beta+1, depth-4, thread_id, verify, false);
+        val = -alpha_beta_negamax(chessboard, -beta, -beta+1, depth-4, thread_id, verify, OPP_NODE(node_type), false);
         chessboard.unmakeNullMove();
         if (val >= beta){
           if (verify){
@@ -367,12 +386,43 @@ class Snakeheadfish{
           }
         }
       }
-      int moves_searched = 0;
-      chess::Movelist ordered_moves;
-      ordered_moves = actions(chessboard, thread_id, depth, ply, legal_moves, hash_move);
-      chess::Move best_move = ordered_moves[0];
-      float best_val = -CHECKMATE_VAL;
-      int r = 1;
+      // Multi-Probcut
+      if (depth > 3 && node_type != PVNode){
+        float bound;
+        float a;
+        float b;
+        float sigma;
+        float percentile;
+        if (!evaluator->is_end_game(chessboard)){
+          a = 1.13;
+          b = 22.5;
+          sigma = 600;
+          percentile = 1;
+        }
+        else{
+          a = 1.1;
+          b = 15;
+          sigma = 500;
+          percentile = 1.4;
+        }
+        int shallow_depth;
+        if (depth <= 8){
+          shallow_depth = ceil(depth/2.0);
+        }
+        else{
+          shallow_depth = depth-4;
+        }
+        bound = std::round((percentile * sigma + beta - b) / a);
+        val = alpha_beta_negamax(chessboard, bound-1, bound, shallow_depth, thread_id, verify, node_type, allow_null_move);
+        if (val >= bound){
+          return val;
+        }
+        bound = std::round((-percentile * sigma + alpha - b) / a);
+        val = alpha_beta_negamax(chessboard, bound, bound+1, shallow_depth, thread_id, verify, node_type, allow_null_move);
+        if (val <= bound){
+          return val;
+        }
+      }
       // Deep futility pruning
       int fmax, fprune, fscore, score, material_balance;
       material_balance = evaluator->material_balance(chessboard);
@@ -382,7 +432,7 @@ class Snakeheadfish{
         material_balance *= -1;
       }
       fscore = static_eval + futility_margin[depth];
-      if (!chessboard.inCheck() && depth == 3 && fscore <= alpha && !pv_node){
+      if (!chessboard.inCheck() && depth == 3 && fscore <= alpha && node_type != PVNode){
         int white_num_pieces = 0;
         int black_num_pieces = 0;
         for(int sq = 0; sq < chess::constants::MAX_SQ; ++sq){
@@ -402,7 +452,7 @@ class Snakeheadfish{
         }
       }
       fscore = static_eval + futility_margin[depth];
-      if (!chessboard.inCheck() && (depth == 2 || depth == 1) && fscore <= alpha && !pv_node){
+      if (!chessboard.inCheck() && (depth == 2 || depth == 1) && fscore <= alpha && node_type != PVNode){
         fprune = 1;
         fmax = fscore;
       }
@@ -411,16 +461,30 @@ class Snakeheadfish{
         depth++;
       }
       // One reply extension
-      if (legal_moves.size() == 0 && !chessboard.inCheck()){
+      else if (legal_moves.size() == 1){
         depth++;
       }
+      float tmp_alpha = alpha;
+      chess::Movelist ordered_moves;
+      ordered_moves = actions(chessboard, thread_id, depth, ply, legal_moves, hash_move);
       goto search;
       search:
+        int moves_searched = 0;
+        chess::Move best_move = chess::Move::NO_MOVE;
+        float best_val = NO_VAL;
+        int r = 1;
+        if (node_type == CutNode){
+          r += 2;
+        }
+        int child_node_type = AllNode;
+        if (node_type != CutNode){
+          child_node_type = CutNode;
+        }
         for (const auto &move : ordered_moves){
           chess::Board new_board = chessboard;
           new_board.makeMove(move);
-          if (moves_searched == 0){
-            val = -alpha_beta_negamax(new_board, -beta, -alpha, depth-1, thread_id, verify);
+          if (moves_searched == 0 && node_type == PVNode){
+            val = -alpha_beta_negamax(new_board, -beta, -alpha, depth-1, thread_id, verify, PVNode);
           }
           else{
             bool killer_move = false;
@@ -434,59 +498,64 @@ class Snakeheadfish{
             }
             int material_gain = new_material_balance-material_balance;
             if (fprune && (fmax + material_gain) <= alpha && !(new_board.inCheck()) && !killer_move){
+              moves_searched++;
               continue;
             }
             // Late move reductions
-            bool allow_late_move_reductions = (!chessboard.inCheck() && !new_board.inCheck() && !chessboard.isCapture(move) && move.typeOf() != chess::Move::PROMOTION && !pv_node && !killer_move);
-            if (moves_searched > 1 && depth >= 3 && allow_late_move_reductions){
-              val = -alpha_beta_negamax(new_board, -(alpha+1), -alpha, depth-1-r, thread_id, verify);
+            bool allow_late_move_reductions = (!chessboard.inCheck() && !new_board.inCheck() && !chessboard.isCapture(move) && move.typeOf() != chess::Move::PROMOTION && node_type != PVNode && !killer_move);
+            if (moves_searched > 1 && depth >= 2 && allow_late_move_reductions){
+              val = -alpha_beta_negamax(new_board, -(alpha+1), -alpha, depth-1-r, thread_id, verify, child_node_type);
             }
             else{
               val = alpha + 1; //Ennsure that it starts PV Search if lmr conditions don't meet
             }
             // PV search
             if (val > alpha){
-              val = -alpha_beta_negamax(new_board, -(alpha+1), -alpha, depth-1, thread_id, verify);
+              val = -alpha_beta_negamax(new_board, -(alpha+1), -alpha, depth-1, thread_id, verify, child_node_type);
               if (val > alpha && val < beta){
-                val = -alpha_beta_negamax(new_board, -beta, -alpha, depth-1, thread_id, verify);     
+                val = -alpha_beta_negamax(new_board, -beta, -alpha, depth-1, thread_id, verify, PVNode);     
               }
             }
           }
           if (val > best_val){
             best_val = val;
-            best_move = move;
-          }
-          if (best_val > alpha){
-            alpha = best_val;
-          }
-          if (null_move_fail_high && alpha < beta){
-            depth++;
-            null_move_fail_high = false;
-            verify = true;
-            goto search;
-          }
-          if (alpha >= beta){
-            if (!chessboard.isCapture(move)){
-              if (this->killer_moves_tables[thread_id].find(ply) == this->killer_moves_tables[thread_id].end()){
-                std::vector<chess::Move> moves = {chess::Move::NO_MOVE, chess::Move::NO_MOVE};
-                moves.at(0) = move;
-                this->killer_moves_tables[thread_id][ply] = moves;
-              }
-              else{
-                if (move != this->killer_moves_tables[thread_id][ply].at(0)){
-                  this->killer_moves_tables[thread_id][ply].at(1) = this->killer_moves_tables[thread_id][ply].at(0);
-                  this->killer_moves_tables[thread_id][ply].at(0) = move;
+            if (val > alpha){
+              best_move = move;
+              alpha = val;
+              if (val >= beta){
+                if (!chessboard.isCapture(move)){
+                  if (this->killer_moves_tables[thread_id].find(ply) == this->killer_moves_tables[thread_id].end()){
+                    std::vector<chess::Move> moves = {chess::Move::NO_MOVE, chess::Move::NO_MOVE};
+                    moves.at(0) = move;
+                    this->killer_moves_tables[thread_id][ply] = moves;
+                  }
+                  else{
+                    if (move != this->killer_moves_tables[thread_id][ply].at(0)){
+                      this->killer_moves_tables[thread_id][ply].at(1) = this->killer_moves_tables[thread_id][ply].at(0);
+                      this->killer_moves_tables[thread_id][ply].at(0) = move;
+                    }
+                  }
                 }
+                break;
               }
             }
-            break;
           }
           moves_searched++;
+        }
+        if (null_move_fail_high && val < beta){
+          depth++;
+          null_move_fail_high = false;
+          verify = true;
+          alpha = tmp_alpha;
+          goto search;
         }
         if (!chessboard.isCapture(best_move)){
           this->history_tables[thread_id][to_move(chessboard)][best_move.from()][best_move.to()] += depth*depth;
         }
-        if ((valid_entry && entry.depth < depth) || !valid_entry){
+        if (best_val == -CHECKMATE_VAL && best_move == chess::Move::NO_MOVE){
+          best_move = ordered_moves[0];
+        }
+        if ((valid_entry && entry.depth <= depth) || !valid_entry){
           tt_entry_t new_entry;
           if (best_val <= original_alpha){
             new_entry.flag = UPPERBOUND;
@@ -507,7 +576,7 @@ class Snakeheadfish{
         return best_val;
     }
 
-    void lazy_smp(chess::Board chessboard){
+    float lazy_smp(chess::Board chessboard){
       init_history_tables();
       for (int i = 0; i < this->thread_num;++i){
         this->killer_moves_tables[i].clear();
@@ -518,22 +587,15 @@ class Snakeheadfish{
       opening_moves = polyglot->listBookMoves(polykey, chessboard);
       if (opening_moves.size() > 0){
         this->next_move = *select_randomly(opening_moves.begin(), opening_moves.end());
-        return;
+        return NO_VAL;
       }
       chess::Movelist legal_moves;
       chess::movegen::legalmoves(legal_moves, chessboard);
       if (legal_moves.size() == 1){
         this->next_move = legal_moves[0];
-        return;
+        return NO_VAL;
       }
-      int total_pieces = 0;
-      for(int sq = 0; sq < chess::constants::MAX_SQ; ++sq){
-        chess::Piece piece = chessboard.at(chess::Square(sq));
-        chess::PieceType piece_type = chess::utils::typeOfPiece(piece);
-        if (piece_type != chess::PieceType::NONE){
-          total_pieces++;
-        }
-      }
+      const auto total_pieces = chess::builtin::popcount(chessboard.occ());
       if (total_pieces <= 5){
         struct pos pos0;
         struct pos *pos = &pos0;
@@ -559,14 +621,18 @@ class Snakeheadfish{
         char str[32];
         move_to_str(pos, move, str);
         this->next_move = chess::uci::parseSan(chessboard, str);
-        return;
+        return NO_VAL;
       }
       std::vector<chess::Board> chessboards;
       for (int i = 0; i < this->thread_num; ++i){
         chess::Board tmp_chessboard = chessboard;
         chessboards.push_back(tmp_chessboard);
       }
-      for (int id = 0; id < this->thread_num; ++id){
+      threads[0] = std::thread(&Snakeheadfish::iterative_deepening_search, this, std::ref(chessboards.at(0)), 0, 1);
+      for (int id = 1; id < this->thread_num/2; ++id){
+        threads[id] = std::thread(&Snakeheadfish::iterative_deepening_search, this, std::ref(chessboards.at(id)), id, this->search_depth-1);
+      }
+      for (int id = this->thread_num/2; id < this->thread_num; ++id){
         threads[id] = std::thread(&Snakeheadfish::iterative_deepening_search, this, std::ref(chessboards.at(id)), id, this->search_depth);
       }
       for (int id = 0; id < this->thread_num; ++id){
@@ -575,19 +641,20 @@ class Snakeheadfish{
       uint64_t zobrist_hash = chessboard.hash();
       tt_entry_t entry = this->transposition_table->probe_table(zobrist_hash);
       this->next_move = entry.best_move;
+      return entry.best_value;
     }
 
     void iterative_deepening_search(chess::Board &chessboard, int id, int search_depth){
       int alpha = -CHECKMATE_VAL;
       int beta = CHECKMATE_VAL;
-      int best_value = -CHECKMATE_VAL;
+      int best_value = NO_VAL;
       tt_entry_t entry;
       std::string fen = chessboard.getFen();
       const char* c_fen = fen.c_str();
       uint64_t zobrist_hash = chessboard.hash();
       int cutoff_depth = 1;
       while (cutoff_depth <= search_depth){
-        alpha_beta_negamax(chessboard, alpha, beta, cutoff_depth, id, true, true);
+        alpha_beta_negamax(chessboard, alpha, beta, cutoff_depth, id, true, PVNode);
         int lock_index = this->transposition_table->hash_function(zobrist_hash);
         entry_locks[lock_index].lock();
         entry = this->transposition_table->probe_table(zobrist_hash);
