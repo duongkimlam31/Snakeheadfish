@@ -8,39 +8,30 @@
 
 // Transposition table entry
 typedef struct {
-  float best_value;
+  int best_value;
   chess::Move best_move;
   int depth;
   int flag;
+  bool extension;
 } tt_entry_t;
 
 typedef struct node{
   uint64_t zobrist_key;
-  tt_entry_t entry;
-  struct node *next_node = NULL;
+  tt_entry_t *entry = NULL;
 } node_t;
 
-typedef struct {
-  node_t *list = NULL;
-} linked_list_t;
 
 class TranspositionTable{
   private:
-    const static int size = (32 * 0x100000)/sizeof(node_t); //Allocate 48 MB for the table
-    linked_list_t *table;
+    const static int size = (0x100000*32); //Allocate 32 MB for the table
+    node_t *table;
   public:
     TranspositionTable(){
-      table = new linked_list_t[size];
+      table = new node_t[size];
     }
     ~TranspositionTable(){
-      for (unsigned int i = 0; i < size; ++i){
-        linked_list_t *linked_list = &table[i];
-        while (linked_list->list != NULL){
-          node_t *tmp_node = linked_list->list;
-          linked_list->list = linked_list->list->next_node;
-          free(tmp_node);
-
-        }
+      for (int i = 0; i < size; ++i){
+        free(table[i].entry);
       }
       delete[] table;
     }
@@ -51,69 +42,36 @@ class TranspositionTable{
       return key % size;
     }
 
-    void update_table(uint64_t key, const tt_entry_t &value){
+    void update_table(uint64_t key, tt_entry_t value){
       int hash_val = hash_function(key);
-      linked_list_t *linked_list = &table[hash_val];
-      node_t *front_node = linked_list->list;
-      node_t *front_front_node = linked_list->list;
-      if (front_node == NULL){
-        node_t *tmp_node = (node_t *) malloc(sizeof(node_t));
-        tmp_node->entry = value;
-        tmp_node->next_node = NULL; 
-        tmp_node->zobrist_key = key;
-        linked_list->list = tmp_node;
-        return;
+      table[hash_val].zobrist_key = key;
+      if (table[hash_val].entry == NULL){
+        tt_entry_t *tmp_entry = (tt_entry_t *) malloc(sizeof(tt_entry_t));
+        tmp_entry->best_value = value.best_value;
+        tmp_entry->depth = value.depth;
+        tmp_entry->extension = value.extension;
+        tmp_entry->flag = value.flag;
+        tmp_entry->best_move = value.best_move;
+        table[hash_val].entry = tmp_entry;
       }
-
-      while (front_node != NULL){
-        if (front_node->zobrist_key == key){
-          front_node->entry = value;
-          return;
-        }
-        front_front_node = front_node;
-        front_node = front_node->next_node;
+      else{
+        table[hash_val].entry->best_value = value.best_value;
+        table[hash_val].entry->depth = value.depth;
+        table[hash_val].entry->extension = value.extension;
+        table[hash_val].entry->flag = value.flag;
+        table[hash_val].entry->best_move = value.best_move;
       }
-      node_t *tmp_node = (node_t *) malloc(sizeof(node_t));
-      tmp_node->entry = value;
-      tmp_node->next_node = NULL; 
-      tmp_node->zobrist_key = key;
-      front_front_node->next_node = tmp_node;
     }
 
     bool is_valid_key(uint64_t key){
       int hash_val = hash_function(key);
-      bool key_exists = false;
-      linked_list_t *linked_list = &table[hash_val];
-      node_t *front_node = linked_list->list;
-      while (front_node != NULL){
-        if (front_node->zobrist_key == key){
-          key_exists = true;
-          break;
-        }
-        front_node = front_node->next_node;
-      }
-      return key_exists;
+      node_t node = table[hash_val];
+      return (node.entry != NULL && node.zobrist_key == key);
     }
 
     tt_entry_t probe_table(uint64_t key){
       int hash_val = hash_function(key);
-      bool key_exists = false;
-      linked_list_t *linked_list = &table[hash_val];
-      node_t *front_node = linked_list->list;
-      tt_entry_t entry;
-      while (front_node != NULL){
-        if (front_node->zobrist_key == key){
-          key_exists = true;
-          entry = front_node->entry;
-          break;
-        }
-        front_node = front_node->next_node;
-      }
-      if (!key_exists){
-        std::cout << "Key doesn't exist\n";
-        exit(-1);
-      }
-      return entry;
+      return *table[hash_val].entry;
     }
 };
 

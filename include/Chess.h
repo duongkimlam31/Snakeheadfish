@@ -8,6 +8,7 @@
 #include <cctype>
 #include <string>
 #include <vector>
+#include <map>
 
 #include "Chessboard.h"
 #include "Snakeheadfish.h"
@@ -126,6 +127,39 @@ class Chess {
     current_team->addPoints(points);
   }
 
+  void printCapturedPieces(){
+    std::vector<Chesspiece *> white_pieces = this->chessboard->getWhiteTeam()->getPieces();
+    std::vector<Chesspiece *> black_pieces = this->chessboard->getBlackTeam()->getPieces();
+    std::map<std::string, int, std::greater<std::string>> white_pieces_set = {{"\u265F", 0}, {"\u265E", 0}, {"\u265D", 0}, {"\u265C", 0}, {"\u265B", 0}};
+    std::map<std::string, int, std::greater<std::string>> black_pieces_set = {{"\u2659", 0}, {"\u2658", 0}, {"\u2657", 0}, {"\u2656", 0}, {"\u2655", 0}};
+    for (int i = 0; i < black_pieces.size(); ++i){
+      if (black_pieces.at(i)->getStatus() == "captured"){
+        black_pieces.at(i)->changeColor();
+        black_pieces_set[black_pieces.at(i)->getIcon()]++;
+      }
+    } 
+    for (int i = 0; i < white_pieces.size(); ++i){
+      if (white_pieces.at(i)->getStatus() == "captured"){
+        white_pieces.at(i)->changeColor();
+        white_pieces_set[white_pieces.at(i)->getIcon()]++;\
+      }
+    } 
+    std::cout << "White team's captured pieces: ";
+    for (const auto & [ key, value ] : black_pieces_set) {
+      for (int i = 0; i < value; ++i){
+        std::cout << key << " ";
+      }
+    }
+    std::cout << std::endl;
+    std::cout << "Black team's captured pieces: ";
+    for (const auto & [ key, value ] : white_pieces_set) {
+      for (int i = 0; i < value; ++i){
+        std::cout << key << " ";
+      }
+    }
+    std::cout << std::endl;
+  }
+
   std::vector<std::string> legalMoveCheck(std::string starting_location,
                                           Chessboard *board, int turn) {
     std::vector<std::string> legalMoves;
@@ -212,7 +246,6 @@ class Chess {
             in_check = true;
             this->chessboard->getWhiteTeam()->getKing()->setStatus("checked");
             this->chessboard->getWhiteTeam()->getKing()->changeColor();
-            std::cout << "White team is in check.\n" << std::endl;
           }
         } else if (turn % 2 != 0) {
           if (inCheck(turn, this->chessboard,
@@ -220,7 +253,6 @@ class Chess {
             in_check = true;
             this->chessboard->getBlackTeam()->getKing()->setStatus("checked");
             this->chessboard->getBlackTeam()->getKing()->changeColor();
-            std::cout << "Black team is in check.\n" << std::endl;
           }
         }
         if (in_check) {
@@ -246,10 +278,12 @@ class Chess {
       }
       if (player_turn) {
         if (turn % 2 != 0 && !announced) {
+          printCapturedPieces();
           std::cout << "Enter 0 to exit.\n";
           std::cout << "Black team's turn: \n";
           announced = true;
         } else if (turn % 2 == 0 && !announced) {
+          printCapturedPieces();
           std::cout << "Enter 0 to exit.\n";
           std::cout << "White team's turn: \n";
           announced = true;
@@ -459,8 +493,8 @@ class Chess {
         this->chessboard->removeCastleStatus();
       }
     }
-    this->chessboard->getWhiteTeam()->getKing()->setStatus("captured");
-    this->chessboard->getBlackTeam()->getKing()->setStatus("captured");
+    this->chessboard->getWhiteTeam()->getKing()->setStatus("active");
+    this->chessboard->getBlackTeam()->getKing()->setStatus("active");
     this->chessboard->getWhiteTeam()->getKing()->changeColor();
     this->chessboard->getBlackTeam()->getKing()->changeColor();
     if (system("clear") == -1) {
@@ -494,10 +528,7 @@ class Chess {
       std::cout << "Checkmate" << std::endl;
       std::cout << "The black team has won" << std::endl;
     }
-    std::cout << "White team's total points: "
-              << this->chessboard->getWhiteTeam()->getPoints() << std::endl;
-    std::cout << "Black team's total points: "
-              << this->chessboard->getBlackTeam()->getPoints() << std::endl;
+    printCapturedPieces();
   }
 };
 

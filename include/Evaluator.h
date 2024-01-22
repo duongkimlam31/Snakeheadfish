@@ -159,11 +159,13 @@ class Evaluator{
     // }
 
     int material_balance(const chess::Board &chessboard){
+      std::unordered_map<chess::Piece, int>  piece_dictionary = {{chess::Piece::WHITEKING, 0}, {chess::Piece::WHITEQUEEN, 2500}, {chess::Piece::WHITEROOK, 1300}, {chess::Piece::WHITEBISHOP, 825}, {chess::Piece::WHITEKNIGHT, 800}, {chess::Piece::WHITEPAWN, 124}, {chess::Piece::BLACKKING, 0}, {chess::Piece::BLACKQUEEN, -2500}, {chess::Piece::BLACKROOK, -1300}, {chess::Piece::BLACKBISHOP, -825}, {chess::Piece::BLACKKNIGHT, -800}, {chess::Piece::BLACKPAWN, -124}};
+      auto occ = chessboard.occ();
       int val = 0;
-      std::unordered_map<chess::PieceType, int>  piece_dictionary = {{chess::PieceType::PAWN, 300}, {chess::PieceType::KNIGHT, 1100}, {chess::PieceType::BISHOP, 1200}, {chess::PieceType::ROOK, 1300}, {chess::PieceType::QUEEN, 2500}, {chess::PieceType::KING, 0}, {chess::PieceType::NONE, 0}};
-      for (const auto & [ piece, value ] : piece_dictionary){
-        val += piece_dictionary[piece] * chess::builtin::popcount(chessboard.pieces(piece, chess::Color::WHITE));
-        val -= piece_dictionary[piece] * chess::builtin::popcount(chessboard.pieces(piece, chess::Color::BLACK));
+      while (occ) {
+        int sq = chess::builtin::poplsb(occ);
+        chess::Piece piece = chessboard.at(chess::Square(sq));
+        val += piece_dictionary[piece];
       }
       return val;
     }
@@ -393,25 +395,57 @@ class Evaluator{
       return val;
     }
 
-    float eg_evaluation_function(const chess::Board &chessboard){
+    int eg_evaluation_function(const chess::Board &chessboard){
       int val = crowded_pawns_evaluation(chessboard) * 5 + passed_pawns_evaluation(chessboard)*5 + material_balance(chessboard) + eg_positional_evaluation(chessboard) + mobility_evaluation(chessboard) * 5 + king_pawn_evaluation(chessboard) * 5 + minor_pieces_evaluation_function(chessboard)*20 + king_attack_evaluation(chessboard) * 5 + center_pawn_evaluation_function(chessboard) * 5;
       return val;
     }
 
-    float nnue_evaluation_function(const chess::Board &chessboard, const chess::Movelist &moves){
+    int nnue_evaluation_function(const chess::Board &chessboard, const chess::Movelist &moves, int ply){
       bool checkmate = (moves.empty() && chessboard.inCheck());
       bool stalemate = (moves.empty() && !chessboard.inCheck());
       if (checkmate){
-        return -CHECKMATE_VAL;
+        return -CHECKMATE_VAL + ply;
       }
       if (stalemate || chessboard.isInsufficientMaterial() || chessboard.isRepetition(1) || chessboard.isHalfMoveDraw()){
         return 0;
       }
-      float eval = nnue_evaluate_fen(chessboard.getFen().c_str());
+      auto occ = chessboard.occ();
+      int pieces[33];
+      int squares[33];
+      int index = 2;
+      std::unordered_map<chess::Piece, int>  piece_dictionary = {{chess::Piece::WHITEKING, 1}, {chess::Piece::WHITEQUEEN, 2}, {chess::Piece::WHITEROOK, 3}, {chess::Piece::WHITEBISHOP, 4}, {chess::Piece::WHITEKNIGHT, 5}, {chess::Piece::WHITEPAWN, 6}, {chess::Piece::BLACKKING, 7}, {chess::Piece::BLACKQUEEN, 8}, {chess::Piece::BLACKROOK, 9}, {chess::Piece::BLACKBISHOP, 10}, {chess::Piece::BLACKKNIGHT, 11}, {chess::Piece::BLACKPAWN, 12}};
+      while (occ) {
+        int sq = chess::builtin::poplsb(occ);
+        chess::Piece piece = chessboard.at(chess::Square(sq));
+        int val;\
+        if (piece == chess::Piece::WHITEKING){
+          val = 1;
+          pieces[0] = val;
+          squares[0] = sq;
+        }
+        else if (piece == chess::Piece::BLACKKING){
+          val = 7;
+          pieces[1] = val;
+          squares[1] = sq;
+        }
+        else{
+          val = piece_dictionary[piece];
+          pieces[index] = val;
+          squares[index] = sq;
+          index++;
+        }
+      }
+      pieces[index] = 0;
+      squares[index] = 0;
+      int side = 0;
+      if (chessboard.sideToMove() == chess::Color::BLACK){
+        side = 1;
+      }
+      int eval = nnue_evaluate(side, pieces, squares);
       return eval;
     }
 
-    float evaluation_function(const chess::Board &chessboard, const chess::Movelist &moves){
+    int evaluation_function(const chess::Board &chessboard, const chess::Movelist &moves){
       bool checkmate = (moves.empty() && chessboard.inCheck());
       bool stalemate = (moves.empty() && !chessboard.inCheck());
       if (checkmate){
@@ -436,7 +470,7 @@ class Evaluator{
         mg_phase = 24;
       }
       int eg_phase = 24 - mg_phase;
-      float val = (mg_eval * mg_phase + eg_eval * eg_phase) / 24.0;
+      int val = (mg_eval * mg_phase + eg_eval * eg_phase) / 24.0;
       if (chessboard.sideToMove() == chess::Color::WHITE){
         return val;
       }

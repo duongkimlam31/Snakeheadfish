@@ -1,6 +1,6 @@
 # Compiler and compilation flags
 CXX = g++
-CXXFLAGS = -std=c++20 -g
+CXXFLAGS = -std=c++20
 
 # Build rule for the target
 all: main.cc nnue.cpp misc.cpp
