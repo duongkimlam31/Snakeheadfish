@@ -53,7 +53,7 @@ When an opponent piece turns red, it means that the player can capture that piec
 23. Multi-Probcut
 
 ## Limitations
-The engine is developed in a Linux environment, so it may not be compatible with devices that use other OS.
+The engine is developed in a Linux environment, so it may not be compatible if it is run on other OS.
 
 ## Acknowledgements
 [Chess Library](https://github.com/Disservin/chess-library)
